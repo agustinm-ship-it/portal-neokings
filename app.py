@@ -49,8 +49,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ID DE GOOGLE SHEETS
-SHEET_ID = "https://docs.google.com/spreadsheets/d/1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88/edit?usp=sharing"
+# ID DE GOOGLE SHEETS LIMPIO (Extraído de tu enlace público)
+SHEET_ID = "1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88"
 
 
 @st.cache_data(ttl=30)
@@ -181,7 +181,7 @@ with col_izq:
     # GEOLOCALIZACIÓN Y CRUCE CON LAS 245 LOCALIDADES DEL SHEETS
     if direccion_input.strip():
         try:
-            geolocator = Nominatim(user_agent="neokings_spl_v11")
+            geolocator = Nominatim(user_agent="neokings_spl_v12")
             loc_geo = geolocator.geocode(
                 f"{direccion_input}, Buenos Aires, Argentina"
             )

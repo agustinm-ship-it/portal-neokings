@@ -1,11 +1,12 @@
 import folium
+from geopy.geocoders import Nominatim
 import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
 
 st.set_page_config(page_title="Portal SPL - Neokings", layout="wide")
 
-# Estilos CSS Oscuro Neón
+# ESTILOS CSS MODO OSCURO
 st.markdown(
     """
     <style>
@@ -17,239 +18,155 @@ st.markdown(
         border: 1px solid #30363d;
         border-radius: 6px;
         font-weight: 600;
-        font-size: 0.85rem;
     }
     .stButton>button:hover { background-color: #30363d; border-color: #58a6ff; }
-    .card-dia {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 8px;
-        padding: 8px;
-        text-align: center;
-        font-size: 0.8rem;
-    }
-    .badge-verde { color: #3dd68c; font-weight: bold; }
-    .badge-amarillo { color: #facc15; font-weight: bold; }
-    .badge-rojo { color: #f87171; font-weight: bold; }
-    .panel-accion {
+    .panel-resumen {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 10px;
         padding: 16px;
         margin-bottom: 15px;
     }
-    .alerta-box {
-        background-color: #2d1517;
-        border: 1px solid #f87171;
-        border-radius: 8px;
-        padding: 10px;
-        color: #f87171;
-        font-size: 0.85rem;
+    .badge-precio {
+        font-size: 1.6rem;
+        font-weight: bold;
+        color: #3dd68c;
+    }
+    .badge-zona {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #58a6ff;
     }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
-# DATOS DE BASE (FALLBACK Y LOCALIDADES)
-LOCALIDADES_BASE = {
-    "Castelar": {
-        "Zona": "OESTE",
-        "Valor": 9700,
-        "Dia": "Martes / Viernes",
-        "Lat": -34.658,
-        "Lon": -58.648,
-    },
-    "Hurlingham": {
-        "Zona": "OESTE",
-        "Valor": 10500,
-        "Dia": "Martes / Viernes",
-        "Lat": -34.588,
-        "Lon": -58.638,
-    },
-    "Vicente Lopez": {
-        "Zona": "NORTE",
-        "Valor": 12700,
-        "Dia": "Lunes / Jueves",
-        "Lat": -34.528,
-        "Lon": -58.473,
-    },
-    "Flores": {
-        "Zona": "CABA",
-        "Valor": 12500,
-        "Dia": "Miércoles",
-        "Lat": -34.628,
-        "Lon": -58.461,
-    },
-    "Belgrano": {
-        "Zona": "CABA",
-        "Valor": 12500,
-        "Dia": "Miércoles",
-        "Lat": -34.561,
-        "Lon": -58.456,
-    },
-}
 
-# ENCABEZADO Y ATAJOS
-col_titulo, col_btn1, col_btn2, col_btn3 = st.columns([3, 1.2, 1.2, 1.5])
-with col_titulo:
-    st.markdown("### 🚚 PORTAL COMERCIAL - SISTEMA SPL")
-with col_btn1:
-    if st.button("📅 Matriz Semanal"):
-        st.toast("Cargando horario por zonas...")
-with col_btn2:
-    if st.button("📋 Reglas Carga"):
-        st.toast("Horario límite: 17:30 hs | Cobros COD activos")
-with col_btn3:
-    if st.button("🔔 Alertas Pendientes (2)"):
-        st.toast("⚠️ 2 pedidos en standby hace casi 2 horas")
+# CARGA DE PLANILLAS OFICIALES NEOKINGS
+@st.cache_data
+def cargar_bases():
+    df_loc = pd.read_csv("BuscadorDireccionesCotizador_Localidades_y_valores.csv")
+    df_hor = pd.read_csv("BuscadorDireccionesCotizador_HORARIOS.csv")
 
-# BANDERAS DÍAS DE LA SEMANA
-c1, c2, c3, c4, c5 = st.columns(5)
-with c1:
-    st.markdown(
-        "<div class='card-dia'><b>LUNES</b><br><small"
-        " style='color:#8b949e'>Zona Norte</small><br>📦 10 | ⏱️ 6.0h<br><span"
-        " class='badge-verde'>🟢 HABILITADO</span></div>",
-        unsafe_allow_html=True,
-    )
-with c2:
-    st.markdown(
-        "<div class='card-dia'><b>MARTES</b><br><small"
-        " style='color:#8b949e'>Zona Oeste</small><br>📦 18 | ⏱️ 5.8h<br><span"
-        " class='badge-amarillo'>🟡 PRÓX. CRÍTICO</span></div>",
-        unsafe_allow_html=True,
-    )
-with c3:
-    st.markdown(
-        "<div class='card-dia'><b>MIÉRCOLES</b><br><small"
-        " style='color:#8b949e'>CABA / Sur</small><br>📦 22 | ⏱️ 7.2h<br><span"
-        " class='badge-rojo'>🔴 CRÍTICO</span></div>",
-        unsafe_allow_html=True,
-    )
-with c4:
-    st.markdown(
-        "<div class='card-dia'><b>JUEVES</b><br><small"
-        " style='color:#8b949e'>Zona Norte</small><br>📦 8 | ⏱️ 4.1h<br><span"
-        " class='badge-verde'>🟢 HABILITADO</span></div>",
-        unsafe_allow_html=True,
-    )
-with c5:
-    st.markdown(
-        "<div class='card-dia'><b>VIERNES</b><br><small"
-        " style='color:#8b949e'>Zona Oeste</small><br>📦 12 | ⏱️ 5.0h<br><span"
-        " class='badge-verde'>🟢 HABILITADO</span></div>",
-        unsafe_allow_html=True,
+    resumen_horarios = df_hor.iloc[5:17, [0, 1]].dropna()
+    resumen_horarios.columns = ["Zona", "Días y Franjas Horarias Habilitadas"]
+
+    return df_loc, resumen_horarios
+
+
+df_localidades, df_franjas = cargar_bases()
+
+# ENCABEZADO
+col_head1, col_head2 = st.columns([3, 1])
+with col_head1:
+    st.markdown("### 🚚 COTIZADOR Y DESPACHO COMERCIAL - SISTEMA SPL")
+with col_head2:
+    vendedor = st.selectbox(
+        "Vendedor Activo:",
+        [
+            "General",
+            "Agustín M.",
+            "Eugenia",
+            "E. Gómez",
+            "G. Collazo",
+            "L. Moreno",
+            "Celina Jara",
+        ],
     )
 
 st.markdown("---")
 
-# COLUMNAS PRINCIPALES
-col_izq, col_der = st.columns([1.4, 1])
+col_izq, col_der = st.columns([1.3, 1])
 
 with col_izq:
-    st.markdown("##### 🔎 Búsqueda de Ubicación y Mapa AMBA")
-    col_input, col_cant = st.columns([3, 1])
-
-    with col_input:
-        direccion_in = st.text_input(
-            "Dirección del Cliente:",
-            value="Tucumán 1763, Castelar",
-            placeholder="Escribí una dirección o localidad...",
-        )
-    with col_cant:
-        paquetes_in = st.number_input("Paquetes:", min_value=1, value=1)
-
-    # Lógica de búsqueda dinámica
-    loc_detectada = "Castelar"
-    for loc_key in LOCALIDADES_BASE.keys():
-        if loc_key.lower() in direccion_in.lower():
-            loc_detectada = loc_key
-            break
-
-    data_loc = LOCALIDADES_BASE[loc_detectada]
-
-    # Dibuja el mapa centrado en la ubicación buscada
-    m = folium.Map(
-        location=[data_loc["Lat"], data_loc["Lon"]],
-        zoom_start=12,
-        tiles="OpenStreetMap",
+    st.markdown("##### 🔎 Buscar Dirección Exacta (AMBA)")
+    direccion_input = st.text_input(
+        "Ingresá Calle, Altura y Localidad:",
+        value="Tucumán 1763, Castelar",
+        placeholder="Ej: Bacacay 1763, Flores",
     )
+
+    # GEOCODIFICACIÓN GRATUITA CON NOMINATIM
+    geolocator = Nominatim(user_agent="neokings_spl_app")
+
+    lat, lon = -34.654, -58.619  # Coordenadas por defecto (Morón)
+    localidad_detectada = "Castelar"
+
+    if direccion_input:
+        try:
+            location = geolocator.geocode(f"{direccion_input}, Buenos Aires, Argentina")
+            if location:
+                lat, lon = location.latitude, location.longitude
+                # Extraer posible localidad del texto buscado
+                for loc in df_localidades["Localidad"].unique():
+                    if loc.lower() in direccion_input.lower():
+                        localidad_detectada = loc
+                        break
+        except Exception:
+            pass
+
+    # BUSCAR DATOS EN LA TABLA LOCALIDADES Y VALORES
+    match = df_localidades[
+        df_localidades["Localidad"].str.lower() == localidad_detectada.lower()
+    ]
+    if match.empty:
+        match = df_localidades.iloc[[0]]
+
+    row_data = match.iloc[0]
+
+    # DIBUJAR MAPA
+    m = folium.Map(location=[lat, lon], zoom_start=13, tiles="OpenStreetMap")
     folium.Marker(
         [-34.654, -58.619],
-        popup="Salida: Depósito Morón",
+        popup="Depósito Morón",
         icon=folium.Icon(color="green", icon="home"),
     ).add_to(m)
     folium.Marker(
-        [data_loc["Lat"], data_loc["Lon"]],
-        popup=f"{direccion_in} - BÚSQUEDA ACTUAL",
+        [lat, lon],
+        popup=f"Cliente: {direccion_input}",
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
     folium.PolyLine(
-        [[-34.654, -58.619], [data_loc["Lat"], data_loc["Lon"]]],
-        color="#38bdf8",
-        weight=4,
-        opacity=0.85,
+        [[-34.654, -58.619], [lat, lon]], color="#38bdf8", weight=4
     ).add_to(m)
 
-    st_folium(m, width=700, height=380)
+    st_folium(m, width=650, height=360)
 
 with col_der:
-    st.markdown("##### ⚙️ Panel de Cotización y Agendamiento")
+    st.markdown("##### 📊 Cotización y Horarios Habilitados")
+
+    zona_key = row_data["Zona"]
+    franja_match = df_franjas[df_franjas["Zona"] == zona_key]
+    franja_txt = (
+        franja_match.iloc[0]["Días y Franjas Horarias Habilitadas"]
+        if not franja_match.empty
+        else "Consulte disponibilidad con logística."
+    )
 
     st.markdown(
         f"""
-    <div class='panel-accion'>
-        <div style='font-size: 0.9rem; color: #58a6ff; font-weight: bold;'>📍 UBICACIÓN DETECTADA: {loc_detectada.upper()} — ZONA {data_loc['Zona']}</div>
-        <div style='display: flex; justify-content: space-between; margin-top: 10px;'>
-            <div><b>Valor Sugerido:</b> ${data_loc['Valor']:,}</div>
-            <div><b>Días Recomendados:</b> {data_loc['Dia']}</div>
+    <div class='panel-resumen'>
+        <div class='badge-zona'>📍 {row_data['Localidad'].upper()} ({row_data['Partido']})</div>
+        <div style='margin-top: 5px;'>CP: <b>{row_data['Código Postal']}</b> | Zona SPL: <b>{row_data['Zona']}</b></div>
+        <hr style='border-color: #30363d; margin: 10px 0;'>
+        <div style='font-size: 0.9rem;'>
+            <b>💰 Valor de Viaje:</b> ${row_data['Valor de viaje']:,}<br>
+            <b>🏷️ Valor Recomendado:</b><br>
+            <span class='badge-precio'>${row_data['Valor Recomendado']:,}</span>
         </div>
         <hr style='border-color: #30363d; margin: 10px 0;'>
         <div style='font-size: 0.85rem;'>
-            <b>Posición Estimada en Ruta:</b> Parada #3<br>
-            <b>Horario Estimado de Entrega:</b> 11:30 – 13:00 hs<br>
-            <b>Kilómetros Adicionales:</b> +3.5 km
+            <b>📅 Días y Franjas Horarias Habilitadas:</b><br>
+            <span style='color:#facc15;'>{franja_txt}</span>
         </div>
     </div>
     """,
         unsafe_allow_html=True,
     )
 
-    dia_seleccionado = st.selectbox(
-        "📅 Seleccionar Día para Entregar:",
-        [
-            "Lunes (Zona Norte)",
-            "Martes (Zona Oeste)",
-            "Miércoles (CABA / Sur)",
-            "Jueves (Zona Norte)",
-            "Viernes (Zona Oeste)",
-        ],
-        index=1 if data_loc["Zona"] == "OESTE" else 0,
-    )
-
-    col_act1, col_act2 = st.columns(2)
-    with col_act1:
-        if st.button("➕ Agendar CONFIRMADO", use_container_width=True):
-            st.success("✅ Pedido Confirmado y sumado a la hoja de ruta.")
-    with col_act2:
-        if st.button("⏳ Dejar PENDIENTE", use_container_width=True):
-            st.warning("⏱️ Pedido en Standby por 2 horas.")
-
-    if "Miércoles" in dia_seleccionado:
-        st.markdown(
-            """
-        <div class='alerta-box'>
-            ⚠️ <b>¡ATENCIÓN! La ruta del Miércoles está AL 100% (CRÍTICA).</b><br>
-            Si lo dejás en pendiente y entra un confirmado, este pedido se desplazará al Jueves.
-        </div>
-        """,
-            unsafe_allow_html=True,
+    paquetes = st.number_input("Cantidad de Bultos/Paquetes:", min_value=1, value=1)
+    if st.button("✅ Confirmar y Agendar Pedido", use_container_width=True):
+        st.success(
+            f"Pedido agendado para {direccion_input} ({paquetes} bulto/s) - Registrado por {vendedor}"
         )
-        if st.button(
-            "🔄 Reubicar al Jueves (Zona Habilitada)", use_container_width=True
-        ):
-            st.info(
-                "📩 Notificación enviada al cliente con propuesta de"
-                " reubicación."
-            )

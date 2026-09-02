@@ -49,7 +49,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ID DE GOOGLE SHEETS LIMPIO (Extraído de tu enlace público)
+# ID DE GOOGLE SHEETS
 SHEET_ID = "1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88"
 
 
@@ -71,18 +71,14 @@ try:
     df_localidades, df_franjas = cargar_datos_sheets(SHEET_ID)
 except Exception:
     st.error(
-        "⚠️ Error al conectar con Google Sheets. Verificá que el ID sea correcto"
-        " y la planilla sea pública."
+        "⚠️ Error al conectar con Google Sheets. Verificá la clave y permisos."
     )
     st.stop()
 
 if "pedidos_ruta" not in st.session_state:
     st.session_state.pedidos_ruta = []
 
-if "direccion_key" not in st.session_state:
-    st.session_state.direccion_key = "Avenida de Mayo 1000, Ramos Mejía"
-
-# DEPÓSITO CASTELAR: TUCUMÁN 1769
+# DEPÓSITO BASE: TUCUMÁN 1769, CASTELAR
 LAT_DEP, LON_DEP = -34.6582, -58.6481
 
 
@@ -161,27 +157,31 @@ st.markdown("---")
 col_izq, col_der = st.columns([1.3, 1])
 
 with col_izq:
-    st.markdown("##### 🔎 Dirección del Cliente y Mapa de Ruta")
+    st.markdown("##### 🔎 Búsqueda de Dirección con Autocompletado")
 
-    col_input, col_reset = st.columns([4, 1])
-    with col_input:
-        direccion_input = st.text_input(
-            "Ingresá Dirección Completa (Calle, Altura y Localidad):",
-            value=st.session_state.direccion_key,
-            placeholder="Ej: Tucumán 1769, Castelar",
-        )
-    with col_reset:
-        if st.button("🗑️ Limpiar Ruta"):
-            st.session_state.pedidos_ruta = []
-            st.rerun()
+    # BUSCADOR PREDICTIVO AUTOCOMPLETADO
+    opciones_localidades = (
+        df_localidades["Localidad"].dropna().unique().tolist()
+    )
+    loc_elegida = st.selectbox(
+        "1. Escribí o seleccioná la Localidad/Barrio:",
+        options=opciones_localidades,
+        index=0,
+    )
+
+    calle_elegida = st.text_input(
+        "2. Calle y Altura exactas:",
+        value="Avenida de Mayo 1000",
+        placeholder="Ej: Marcelo T. de Alvear 2442",
+    )
+
+    direccion_input = f"{calle_elegida}, {loc_elegida}"
 
     lat_actual, lon_actual = LAT_DEP, LON_DEP
-    loc_detectada = ""
 
-    # GEOLOCALIZACIÓN Y CRUCE CON LAS 245 LOCALIDADES DEL SHEETS
     if direccion_input.strip():
         try:
-            geolocator = Nominatim(user_agent="neokings_spl_v12")
+            geolocator = Nominatim(user_agent="neokings_spl_v13")
             loc_geo = geolocator.geocode(
                 f"{direccion_input}, Buenos Aires, Argentina"
             )
@@ -190,19 +190,15 @@ with col_izq:
         except Exception:
             pass
 
-        for loc_nombre in df_localidades["Localidad"].dropna().unique():
-            if str(loc_nombre).lower() in direccion_input.lower():
-                loc_detectada = str(loc_nombre)
-                break
-
     match = df_localidades[
         df_localidades["Localidad"].astype(str).str.lower()
-        == loc_detectada.lower()
+        == loc_elegida.lower()
     ]
     row_data = (
         match.iloc[0] if not match.empty else df_localidades.iloc[0]
     )
 
+    # DETERMINACIÓN DINÁMICA DEL PUNTO ANTERIOR DE LA RUTA
     if len(st.session_state.pedidos_ruta) == 0:
         origen_lat, origen_lon = LAT_DEP, LON_DEP
         origen_nombre = "Depósito Castelar"
@@ -217,6 +213,7 @@ with col_izq:
         origen_lat, origen_lon, lat_actual, lon_actual
     )
 
+    # MAPA CON RUTA
     m = folium.Map(
         location=[lat_actual, lon_actual], zoom_start=12, tiles="OpenStreetMap"
     )
@@ -350,7 +347,6 @@ with col_der:
                 "lat": lat_actual,
                 "lon": lon_actual,
             })
-            st.session_state.direccion_key = ""
             st.success(
                 f"✅ Parada #{num_parada} ({nombre_cliente}) agendada por"
                 f" {vendedor_sel}."
@@ -360,10 +356,12 @@ with col_der:
         if st.button("⏳ Dejar PENDIENTE", use_container_width=True):
             st.warning("⏱️ Guardado en Standby por 2 horas.")
 
-# TABLA EN VIVO DE HOJA DE RUTA
+# TABLA EN VIVO EDITABLE PARA LOS VENDEDORES
 if len(st.session_state.pedidos_ruta) > 0:
     st.markdown("---")
-    st.markdown("##### 📋 Hoja de Ruta Activa (Pedidos Agendados)")
+    st.markdown(
+        "##### 📋 Hoja de Ruta Activa (Podés editar directamente en la tabla)"
+    )
     df_tabla = pd.DataFrame(st.session_state.pedidos_ruta)[
         [
             "parada",
@@ -390,4 +388,8 @@ if len(st.session_state.pedidos_ruta) > 0:
         "Bultos",
         "Día Programado",
     ]
-    st.dataframe(df_tabla, use_container_width=True)
+
+    # COMPONENTE EDITABLE INTERACTIVO
+    edited_df = st.data_editor(
+        df_tabla, use_container_width=True, num_rows="dynamic"
+    )

@@ -8,13 +8,14 @@ st.set_page_config(
     page_title="Portal SPL - Neokings", layout="wide", page_icon="🚚"
 )
 
-# ESTILOS OSCURO NEÓN SIN SELECTOR SUPERIOR
+# ESTILOS MODO OSCURO NEÓN (DISEÑO LIMPIO)
 st.markdown(
     """
     <style>
     .stApp { background-color: #0d1117; color: #c9d1d9; }
-    .block-container { padding-top: 1rem; padding-bottom: 1rem; }
+    .block-container { padding-top: 1.2rem; padding-bottom: 1.2rem; }
     
+    /* Botones Atajo */
     .stButton>button {
         background-color: #21262d;
         color: #58a6ff;
@@ -25,6 +26,7 @@ st.markdown(
     }
     .stButton>button:hover { background-color: #30363d; border-color: #58a6ff; }
 
+    /* Tarjetas de Días */
     .card-dia {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -37,21 +39,32 @@ st.markdown(
     .badge-amarillo { color: #facc15; font-weight: bold; }
     .badge-rojo { color: #f87171; font-weight: bold; }
     
+    /* Panel de Cotización */
     .panel-resumen {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 10px;
-        padding: 18px;
+        padding: 20px;
         margin-bottom: 15px;
     }
-    .badge-precio { font-size: 1.8rem; font-weight: bold; color: #3dd68c; }
-    .badge-zona { font-size: 1.1rem; font-weight: bold; color: #58a6ff; }
+    .badge-precio { font-size: 2.2rem; font-weight: bold; color: #3dd68c; line-height: 1.1; }
+    .badge-zona { font-size: 1.2rem; font-weight: bold; color: #58a6ff; }
+    .info-alerta {
+        background-color: #2d1517;
+        border: 1px solid #f87171;
+        border-radius: 6px;
+        padding: 8px 12px;
+        color: #f87171;
+        font-size: 0.82rem;
+        margin-top: 10px;
+    }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
-# ID DE TU GOOGLE SHEETS
+# LINK A TU GOOGLE SHEETS
+# Pegá el ID o la URL completa de tu archivo entre las comillas
 SHEET_ID = "https://docs.google.com/spreadsheets/d/1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88/edit?usp=sharing"
 
 
@@ -63,14 +76,13 @@ def cargar_bases_desde_sheets(sheet_id):
         df_loc = pd.read_csv(url_loc)
         df_hor = pd.read_csv(url_hor)
 
-        # Limpieza de columnas
         df_loc.columns = [c.strip() for c in df_loc.columns]
         resumen_horarios = df_hor.iloc[5:17, [0, 1]].dropna()
         resumen_horarios.columns = ["Zona", "Días y Franjas Horarias Habilitadas"]
 
         return df_loc, resumen_horarios
     except Exception:
-        # Respaldo si no está configurado el ID aún
+        # Base de Respaldo Integrada para Evitar Pantallas Rojas
         datos_loc = [
             {
                 "Localidad": "Castelar",
@@ -96,6 +108,14 @@ def cargar_bases_desde_sheets(sheet_id):
                 "Código Postal": "1428",
                 "Valor Recomendado": 13600,
             },
+            {
+                "Localidad": "Flores",
+                "Partido": "CABA",
+                "Zona": "CABA",
+                "Valor de viaje": 12500,
+                "Código Postal": "1406",
+                "Valor Recomendado": 12500,
+            },
         ]
         datos_hor = [
             {
@@ -110,27 +130,33 @@ def cargar_bases_desde_sheets(sheet_id):
                     "Lun y Jue: 08:30-11:00 hs | Mié: 13:00-15:00 hs"
                 ),
             },
+            {
+                "Zona": "CABA",
+                "Días y Franjas Horarias Habilitadas": (
+                    "Lun a Vie: 08:30-11:00 hs / 13:00-15:00 hs"
+                ),
+            },
         ]
         return pd.DataFrame(datos_loc), pd.DataFrame(datos_hor)
 
 
 df_localidades, df_franjas = cargar_bases_desde_sheets(SHEET_ID)
 
-# 1. ENCABEZADO Y BOTONES DE ATAJO (SIN VENDEDORES)
-col_head1, col_b1, col_b2, col_b3 = st.columns([3, 1, 1, 1.2])
+# 1. ENCABEZADO Y ATAJOS (LIMPIO)
+col_head1, col_b1, col_b2, col_b3 = st.columns([3.5, 1, 1, 1.2])
 with col_head1:
     st.markdown("### 🚚 PORTAL COMERCIAL - SISTEMA SPL")
 with col_b1:
     if st.button("📅 Matriz Semanal"):
-        st.toast("Matriz de zonificación cargada.")
+        st.toast("Cargando matriz semanal de zonificación...")
 with col_b2:
     if st.button("📋 Reglas Carga"):
-        st.toast("Límite de carga: 17:30 hs.")
+        st.toast("Horario límite de carga: 17:30 hs.")
 with col_b3:
-    if st.button("🔔 Alertas Pendientes (2)"):
-        st.toast("⚠️ 2 pedidos en standby hace 1h 45m.")
+    if st.button("🔔 Alertas (2)"):
+        st.toast("⚠️ 2 pedidos pendientes hace más de 1h 45m.")
 
-# 2. CUADROS SEMANALES DE CAPACIDAD
+# 2. BANDERAS DÍAS DE LA SEMANA
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
     st.markdown(
@@ -170,39 +196,42 @@ with c5:
 
 st.markdown("---")
 
-# 3. COLUMNAS PRINCIPALES
+# 3. MÓDULO PRINCIPAL DE BÚSQUEDA Y AGENDAMIENTO
 col_izq, col_der = st.columns([1.3, 1])
 
 with col_izq:
-    st.markdown("##### 🔎 Búsqueda de Dirección / Localidad")
+    st.markdown("##### 🔎 Selección de Ubicación del Cliente")
 
-    # BUSCADOR AUTOCOMPLETADO
-    lista_opciones = df_localidades["Localidad"].astype(str).tolist()
+    lista_localidades = (
+        df_localidades["Localidad"].astype(str).unique().tolist()
+    )
     localidad_sel = st.selectbox(
-        "Seleccioná la Localidad/Barrio:",
-        options=lista_opciones,
+        "1. Localidad / Barrio (Padrón 245 Zonas):",
+        options=lista_localidades,
         index=0,
     )
 
     calle_altura = st.text_input(
-        "Dirección exacta (Calle y Altura):",
+        "2. Calle y Altura exactos:",
         value="Santiago del Estero 1557",
         placeholder="Ej: Bacacay 1763",
     )
 
-    # GEOCODIFICACIÓN
-    geolocator = Nominatim(user_agent="neokings_spl_app_v3")
+    # Coordenadas por defecto (Morón)
     lat, lon = -34.654, -58.619
 
-    try:
-        query_geo = f"{calle_altura}, {localidad_sel}, Buenos Aires, Argentina"
-        location = geolocator.geocode(query_geo)
-        if location:
-            lat, lon = location.latitude, location.longitude
-    except Exception:
-        pass
+    # Intentar obtener ubicación geográfica exacta
+    if calle_altura and localidad_sel:
+        geolocator = Nominatim(user_agent="neokings_spl_app_v4")
+        try:
+            query = f"{calle_altura}, {localidad_sel}, Buenos Aires, Argentina"
+            location = geolocator.geocode(query)
+            if location:
+                lat, lon = location.latitude, location.longitude
+        except Exception:
+            pass
 
-    # CRUCE CON PLANILLA
+    # Obtener fila correspondiente
     match = df_localidades[
         df_localidades["Localidad"].astype(str).str.lower()
         == localidad_sel.lower()
@@ -211,7 +240,7 @@ with col_izq:
         match.iloc[0] if not match.empty else df_localidades.iloc[0]
     )
 
-    # MAPA
+    # MAPA DEL AMBA CON RUTEO
     m = folium.Map(location=[lat, lon], zoom_start=13, tiles="OpenStreetMap")
     folium.Marker(
         [-34.654, -58.619],
@@ -227,7 +256,7 @@ with col_izq:
         [[-34.654, -58.619], [lat, lon]], color="#38bdf8", weight=4
     ).add_to(m)
 
-    st_folium(m, width=650, height=340)
+    st_folium(m, width=680, height=360)
 
 with col_der:
     st.markdown("##### ⚙️ Panel de Cotización y Agendamiento")
@@ -242,17 +271,26 @@ with col_der:
         else "Consulte disponibilidad con logística."
     )
 
+    valor_viaje = row_data["Valor de viaje"]
+    valor_rec = row_data["Valor Recomendado"]
+
     st.markdown(
         f"""
     <div class='panel-resumen'>
         <div class='badge-zona'>📍 {str(row_data['Localidad']).upper()} ({row_data['Partido']})</div>
-        <div style='margin-top: 5px;'>CP: <b>{row_data['Código Postal']}</b> | Zona SPL: <b>{row_data['Zona']}</b></div>
-        <hr style='border-color: #30363d; margin: 10px 0;'>
-        <div style='display: flex; justify-content: space-between;'>
-            <div><b>💰 Valor de Viaje:</b><br>${row_data['Valor de viaje']:,}</div>
-            <div><b>🏷️ Valor Recomendado:</b><br><span class='badge-precio'>${row_data['Valor Recomendado']:,}</span></div>
+        <div style='margin-top: 4px; font-size: 0.88rem;'>CP: <b>{row_data['Código Postal']}</b> | Zona SPL: <b>{row_data['Zona']}</b></div>
+        <hr style='border-color: #30363d; margin: 12px 0;'>
+        <div style='display: flex; justify-content: space-between; align-items: center;'>
+            <div>
+                <small style='color: #8b949e;'>Valor de Viaje Base:</small><br>
+                <span style='font-size: 1.1rem; font-weight: bold;'>${valor_viaje:,}</span>
+            </div>
+            <div style='text-align: right;'>
+                <small style='color: #8b949e;'>Valor Recomendado:</small><br>
+                <span class='badge-precio'>${valor_rec:,}</span>
+            </div>
         </div>
-        <hr style='border-color: #30363d; margin: 10px 0;'>
+        <hr style='border-color: #30363d; margin: 12px 0;'>
         <div style='font-size: 0.85rem;'>
             <b>📅 Días y Franjas Habilitadas:</b><br>
             <span style='color:#facc15;'>{franja_txt}</span>
@@ -263,12 +301,31 @@ with col_der:
     )
 
     bultos = st.number_input("📦 Cantidad de Bultos/Paquetes:", min_value=1, value=1)
+    dia_agendado = st.selectbox(
+        "📅 Seleccionar Día para Programar Entrega:",
+        [
+            "Martes (Zona Oeste)",
+            "Viernes (Zona Oeste)",
+            "Lunes (Zona Norte)",
+            "Miércoles (CABA / Sur)",
+            "Jueves (Zona Norte)",
+        ],
+    )
 
+    if "Miércoles" in dia_agendado:
+        st.markdown(
+            "<div class='info-alerta'>⚠️ <b>Atención:</b> La ruta del Miércoles"
+            " está al 100% de capacidad (CRÍTICA).</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
     c_act1, c_act2 = st.columns(2)
     with c_act1:
         if st.button("➕ Agendar CONFIRMADO", use_container_width=True):
             st.success(
-                f"✅ Pedido confirmado para {calle_altura}, {localidad_sel} ({bultos} bulto/s)."
+                f"✅ Pedido confirmado para {calle_altura}, {localidad_sel}"
+                f" ({bultos} bulto/s) agendado para el {dia_agendado}."
             )
     with c_act2:
         if st.button("⏳ Dejar PENDIENTE", use_container_width=True):

@@ -49,70 +49,38 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# INGRESA TU ID DE GOOGLE SHEETS
+# ID DE GOOGLE SHEETS
 SHEET_ID = "https://docs.google.com/spreadsheets/d/1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88/edit?usp=sharing"
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=30)
 def cargar_datos_sheets(sheet_id):
-    try:
-        url_loc = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=Localidades%20y%20valores"
-        url_hor = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=HORARIOS"
-        df_loc = pd.read_csv(url_loc)
-        df_hor = pd.read_csv(url_hor)
+    url_loc = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=Localidades%20y%20valores"
+    url_hor = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=HORARIOS"
+    df_loc = pd.read_csv(url_loc)
+    df_hor = pd.read_csv(url_hor)
 
-        df_loc.columns = [c.strip() for c in df_loc.columns]
-        resumen_horarios = df_hor.iloc[5:17, [0, 1]].dropna()
-        resumen_horarios.columns = ["Zona", "Días y Franjas Horarias Habilitadas"]
-        return df_loc, resumen_horarios
-    except Exception:
-        df_loc = pd.DataFrame([
-            {
-                "Localidad": "Castelar",
-                "Partido": "Morón",
-                "Zona": "OESTE",
-                "Valor de viaje": 9700,
-                "Código Postal": "1712",
-                "Valor Recomendado": 9700,
-            },
-            {
-                "Localidad": "Paso del Rey",
-                "Partido": "Moreno",
-                "Zona": "OESTE",
-                "Valor de viaje": 11500,
-                "Código Postal": "1742",
-                "Valor Recomendado": 11500,
-            },
-            {
-                "Localidad": "Flores",
-                "Partido": "CABA",
-                "Zona": "CABA",
-                "Valor de viaje": 12500,
-                "Código Postal": "1406",
-                "Valor Recomendado": 12500,
-            },
-        ])
-        df_hor = pd.DataFrame([
-            {
-                "Zona": "OESTE",
-                "Días y Franjas Horarias Habilitadas": (
-                    "Mar y Mié: 08:30-11:00 hs | Vie: 15:00-17:00 hs"
-                ),
-            },
-            {
-                "Zona": "CABA",
-                "Días y Franjas Horarias Habilitadas": (
-                    "Lun y Jue: 08:30-11:00 hs | Mié: 13:00-15:00 hs"
-                ),
-            },
-        ])
-        return df_loc, df_hor
+    df_loc.columns = [c.strip() for c in df_loc.columns]
+    resumen_horarios = df_hor.iloc[5:17, [0, 1]].dropna()
+    resumen_horarios.columns = ["Zona", "Días y Franjas Horarias Habilitadas"]
+
+    return df_loc, resumen_horarios
 
 
-df_localidades, df_franjas = cargar_datos_sheets(SHEET_ID)
+try:
+    df_localidades, df_franjas = cargar_datos_sheets(SHEET_ID)
+except Exception:
+    st.error(
+        "⚠️ Error al conectar con Google Sheets. Verificá que el ID sea correcto"
+        " y la planilla sea pública."
+    )
+    st.stop()
 
 if "pedidos_ruta" not in st.session_state:
     st.session_state.pedidos_ruta = []
+
+if "direccion_key" not in st.session_state:
+    st.session_state.direccion_key = "Avenida de Mayo 1000, Ramos Mejía"
 
 # DEPÓSITO CASTELAR: TUCUMÁN 1769
 LAT_DEP, LON_DEP = -34.6582, -58.6481
@@ -129,7 +97,6 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
     return round(R * c, 1)
 
 
-# PRIORIDAD DE ZONAS POR DÍA
 PRIORIDADES = {
     "OESTE": "Martes y Viernes (Prioridad Zona Oeste)",
     "CABA": "Lunes y Miércoles (Prioridad CABA)",
@@ -137,7 +104,7 @@ PRIORIDADES = {
     "SUR": "Martes y Miércoles (Prioridad Zona Sur)",
 }
 
-# ENCABEZADO Y ATAJOS
+# 1. ENCABEZADO Y ATAJOS
 col_head1, col_b1, col_b2, col_b3 = st.columns([3.5, 1, 1, 1.2])
 with col_head1:
     st.markdown("### 🚚 PORTAL COMERCIAL - SISTEMA SPL")
@@ -151,7 +118,7 @@ with col_b3:
     if st.button("🔔 Alertas (2)"):
         st.toast("⚠️ 2 pedidos pendientes en límite.")
 
-# CAPACIDAD SEMANAL
+# 2. CAPACIDAD SEMANAL
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
     st.markdown(
@@ -200,7 +167,7 @@ with col_izq:
     with col_input:
         direccion_input = st.text_input(
             "Ingresá Dirección Completa (Calle, Altura y Localidad):",
-            value="Bacacay 1763, Flores",
+            value=st.session_state.direccion_key,
             placeholder="Ej: Tucumán 1769, Castelar",
         )
     with col_reset:
@@ -209,12 +176,12 @@ with col_izq:
             st.rerun()
 
     lat_actual, lon_actual = LAT_DEP, LON_DEP
-    loc_detectada = "Castelar"
+    loc_detectada = ""
 
-    # RESOLUCIÓN AUTOMÁTICA DE DIRECCIÓN Y ZONA
+    # GEOLOCALIZACIÓN Y CRUCE CON LAS 245 LOCALIDADES DEL SHEETS
     if direccion_input.strip():
         try:
-            geolocator = Nominatim(user_agent="neokings_spl_v10")
+            geolocator = Nominatim(user_agent="neokings_spl_v11")
             loc_geo = geolocator.geocode(
                 f"{direccion_input}, Buenos Aires, Argentina"
             )
@@ -236,7 +203,6 @@ with col_izq:
         match.iloc[0] if not match.empty else df_localidades.iloc[0]
     )
 
-    # CÁLCULO DE ORIGEN Y DISTANCIA TRAMO
     if len(st.session_state.pedidos_ruta) == 0:
         origen_lat, origen_lon = LAT_DEP, LON_DEP
         origen_nombre = "Depósito Castelar"
@@ -251,7 +217,6 @@ with col_izq:
         origen_lat, origen_lon, lat_actual, lon_actual
     )
 
-    # MAPA CON TRAYECTORIA
     m = folium.Map(
         location=[lat_actual, lon_actual], zoom_start=12, tiles="OpenStreetMap"
     )
@@ -336,10 +301,18 @@ with col_der:
             placeholder="Ej: Juan Pérez",
         )
     with col_c2:
-        telefono_cliente = st.text_input(
-            "📞 Teléfono / Contacto:",
-            value="11 4455-8899",
-            placeholder="Ej: 1122334455",
+        vendedor_sel = st.selectbox(
+            "🏷️ Vendedor Asignado:",
+            [
+                "Ventas01",
+                "Ventas02",
+                "Ventas03",
+                "Ventas04",
+                "Ventas05",
+                "Ventas06",
+                "Ventas07",
+            ],
+            index=0,
         )
 
     col_b1, col_b2 = st.columns(2)
@@ -366,7 +339,7 @@ with col_der:
             st.session_state.pedidos_ruta.append({
                 "parada": num_parada,
                 "cliente": nombre_cliente,
-                "contacto": telefono_cliente,
+                "vendedor": vendedor_sel,
                 "direccion": direccion_input,
                 "localidad": row_data["Localidad"],
                 "zona": row_data["Zona"],
@@ -377,15 +350,17 @@ with col_der:
                 "lat": lat_actual,
                 "lon": lon_actual,
             })
+            st.session_state.direccion_key = ""
             st.success(
-                f"✅ Parada #{num_parada} ({nombre_cliente}) agendada."
+                f"✅ Parada #{num_parada} ({nombre_cliente}) agendada por"
+                f" {vendedor_sel}."
             )
             st.rerun()
     with c_act2:
         if st.button("⏳ Dejar PENDIENTE", use_container_width=True):
             st.warning("⏱️ Guardado en Standby por 2 horas.")
 
-# TABLA EN VIVO DE PEDIDOS CARGADOS EN RUTA
+# TABLA EN VIVO DE HOJA DE RUTA
 if len(st.session_state.pedidos_ruta) > 0:
     st.markdown("---")
     st.markdown("##### 📋 Hoja de Ruta Activa (Pedidos Agendados)")
@@ -393,7 +368,7 @@ if len(st.session_state.pedidos_ruta) > 0:
         [
             "parada",
             "cliente",
-            "contacto",
+            "vendedor",
             "direccion",
             "localidad",
             "zona",
@@ -406,7 +381,7 @@ if len(st.session_state.pedidos_ruta) > 0:
     df_tabla.columns = [
         "Parada #",
         "Cliente",
-        "Contacto",
+        "Vendedor",
         "Dirección",
         "Localidad",
         "Zona",

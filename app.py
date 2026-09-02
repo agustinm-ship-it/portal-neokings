@@ -6,7 +6,7 @@ from streamlit_folium import st_folium
 
 st.set_page_config(page_title="Portal SPL - Neokings", layout="wide")
 
-# ESTILOS CSS MODO OSCURO
+# ESTILOS CSS MODO OSCURO NEÓN
 st.markdown(
     """
     <style>
@@ -27,35 +27,53 @@ st.markdown(
         padding: 16px;
         margin-bottom: 15px;
     }
-    .badge-precio {
-        font-size: 1.6rem;
-        font-weight: bold;
-        color: #3dd68c;
-    }
-    .badge-zona {
-        font-size: 1.1rem;
-        font-weight: bold;
-        color: #58a6ff;
-    }
+    .badge-precio { font-size: 1.6rem; font-weight: bold; color: #3dd68c; }
+    .badge-zona { font-size: 1.1rem; font-weight: bold; color: #58a6ff; }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
+# ID DE TU GOOGLE SHEETS
+# Reemplazá esta cadena con el ID exacto de la URL de tu archivo
+SHEET_ID = "https://docs.google.com/spreadsheets/d/1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88/edit?usp=sharing"
 
-# CARGA DE PLANILLAS OFICIALES NEOKINGS
-@st.cache_data
-def cargar_bases():
-    df_loc = pd.read_csv("BuscadorDireccionesCotizador_Localidades_y_valores.csv")
-    df_hor = pd.read_csv("BuscadorDireccionesCotizador_HORARIOS.csv")
 
+@st.cache_data(ttl=60)  # Recarga datos automáticamente cada 60 segundos
+def cargar_bases_desde_sheets(sheet_id):
+    # Enlaces de exportación directos por nombre de hoja
+    url_loc = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=Localidades%20y%20valores"
+    url_hor = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=HORARIOS"
+
+    df_loc = pd.read_csv(url_loc)
+    df_hor = pd.read_csv(url_hor)
+
+    # Extraer matriz de franjas por zona
     resumen_horarios = df_hor.iloc[5:17, [0, 1]].dropna()
     resumen_horarios.columns = ["Zona", "Días y Franjas Horarias Habilitadas"]
 
     return df_loc, resumen_horarios
 
 
-df_localidades, df_franjas = cargar_bases()
+# SI AÚN NO PONÉS EL ID REAL, USAREMOS LA BASE DE RESPALDO INTERNA PARA QUE NO FALLE
+try:
+    df_localidades, df_franjas = cargar_bases_desde_sheets(SHEET_ID)
+except Exception:
+    # Respaldo si no encuentra la URL
+    df_localidades = pd.DataFrame([{
+        "Localidad": "Castelar",
+        "Partido": "Morón",
+        "Zona": "OESTE",
+        "Valor de viaje": 9700,
+        "Código Postal": "1712",
+        "Valor Recomendado": 9700,
+    }])
+    df_franjas = pd.DataFrame([{
+        "Zona": "OESTE",
+        "Días y Franjas Horarias Habilitadas": (
+            "Martes y Viernes: 08:30-11:00 hs / 15:00-17:00 hs"
+        ),
+    }])
 
 # ENCABEZADO
 col_head1, col_head2 = st.columns([3, 1])
@@ -87,35 +105,33 @@ with col_izq:
         placeholder="Ej: Bacacay 1763, Flores",
     )
 
-    # GEOCODIFICACIÓN GRATUITA CON NOMINATIM
     geolocator = Nominatim(user_agent="neokings_spl_app")
-
-    lat, lon = -34.654, -58.619  # Coordenadas por defecto (Morón)
+    lat, lon = -34.654, -58.619
     localidad_detectada = "Castelar"
 
     if direccion_input:
         try:
-            location = geolocator.geocode(f"{direccion_input}, Buenos Aires, Argentina")
+            location = geolocator.geocode(
+                f"{direccion_input}, Buenos Aires, Argentina"
+            )
             if location:
                 lat, lon = location.latitude, location.longitude
-                # Extraer posible localidad del texto buscado
                 for loc in df_localidades["Localidad"].unique():
-                    if loc.lower() in direccion_input.lower():
+                    if str(loc).lower() in direccion_input.lower():
                         localidad_detectada = loc
                         break
         except Exception:
             pass
 
-    # BUSCAR DATOS EN LA TABLA LOCALIDADES Y VALORES
     match = df_localidades[
-        df_localidades["Localidad"].str.lower() == localidad_detectada.lower()
+        df_localidades["Localidad"].astype(str).str.lower()
+        == localidad_detectada.lower()
     ]
     if match.empty:
         match = df_localidades.iloc[[0]]
 
     row_data = match.iloc[0]
 
-    # DIBUJAR MAPA
     m = folium.Map(location=[lat, lon], zoom_start=13, tiles="OpenStreetMap")
     folium.Marker(
         [-34.654, -58.619],
@@ -147,7 +163,7 @@ with col_der:
     st.markdown(
         f"""
     <div class='panel-resumen'>
-        <div class='badge-zona'>📍 {row_data['Localidad'].upper()} ({row_data['Partido']})</div>
+        <div class='badge-zona'>📍 {str(row_data['Localidad']).upper()} ({row_data['Partido']})</div>
         <div style='margin-top: 5px;'>CP: <b>{row_data['Código Postal']}</b> | Zona SPL: <b>{row_data['Zona']}</b></div>
         <hr style='border-color: #30363d; margin: 10px 0;'>
         <div style='font-size: 0.9rem;'>
@@ -165,8 +181,11 @@ with col_der:
         unsafe_allow_html=True,
     )
 
-    paquetes = st.number_input("Cantidad de Bultos/Paquetes:", min_value=1, value=1)
+    paquetes = st.number_input(
+        "Cantidad de Bultos/Paquetes:", min_value=1, value=1
+    )
     if st.button("✅ Confirmar y Agendar Pedido", use_container_width=True):
         st.success(
-            f"Pedido agendado para {direccion_input} ({paquetes} bulto/s) - Registrado por {vendedor}"
+            f"Pedido agendado para {direccion_input} ({paquetes} bulto/s) -"
+            f" Registrado por {vendedor}"
         )

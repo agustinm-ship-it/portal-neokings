@@ -4,16 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal SPL - Neokings</title>
-    <!-- CSS Leaflet Mapa -->
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
         body { background-color: #0d1117; color: #c9d1d9; padding: 15px; }
-        h3 { color: #58a6ff; margin-bottom: 10px; }
+        h3 { color: #58a6ff; margin-bottom: 12px; }
+        
         .grid-header { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 15px; }
         .card-dia { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px; text-align: center; font-size: 0.8rem; }
-        .card-dia span { font-weight: bold; }
-        .verde { color: #3dd68c; } .amarillo { color: #facc15; } .rojo { color: #f87171; }
+        .verde { color: #3dd68c; font-weight: bold; } 
+        .amarillo { color: #facc15; font-weight: bold; } 
+        .rojo { color: #f87171; font-weight: bold; }
         
         .main-container { display: grid; grid-template-columns: 1.3fr 1fr; gap: 15px; }
         .panel { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 15px; position: relative; }
@@ -22,20 +24,32 @@
         button { background: #238636; color: white; font-weight: bold; cursor: pointer; border: none; margin-top: 15px; }
         button:hover { background: #2ea043; }
         
-        /* Buscador Predictivo */
-        .suggestions-box { position: absolute; top: 75px; left: 15px; right: 15px; background: #161b22; border: 1px solid #58a6ff; z-index: 1000; max-height: 200px; overflow-y: auto; border-radius: 6px; }
+        /* Contenedor del Buscador y Desplegable */
+        .search-box-wrapper { position: relative; width: 100%; }
+        .suggestions-box { 
+            position: absolute; 
+            top: 100%; 
+            left: 0; 
+            right: 0; 
+            background: #161b22; 
+            border: 1px solid #58a6ff; 
+            z-index: 9999; 
+            max-height: 220px; 
+            overflow-y: auto; 
+            border-radius: 6px; 
+            box-shadow: 0px 8px 16px rgba(0,0,0,0.5);
+        }
         .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #30363d; font-size: 0.85rem; }
         .suggestion-item:hover { background: #21262d; color: #58a6ff; }
         
         #map { height: 360px; border-radius: 8px; margin-top: 10px; }
-        .badge-precio { font-size: 2rem; color: #3dd68c; font-weight: bold; }
+        .badge-precio { font-size: 1.8rem; color: #3dd68c; font-weight: bold; }
         
-        /* Tabla de Hoja de Ruta */
         .tabla-container { margin-top: 20px; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 15px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
         th, td { border: 1px solid #30363d; padding: 8px; text-align: left; }
         th { background: #21262d; color: #58a6ff; }
-        .btn-eliminar { background: #da3633; padding: 4px 8px; margin: 0; font-size: 0.75rem; }
+        .btn-eliminar { background: #da3633; padding: 4px 8px; margin: 0; font-size: 0.75rem; width: auto; }
     </style>
 </head>
 <body>
@@ -51,22 +65,24 @@
     </div>
 
     <div class="main-container">
-        <!-- COLUMNA BÚSQUEDA Y MAPA -->
+        <!-- BUSCADOR Y MAPA -->
         <div class="panel">
-            <h5>🔎 Búsqueda de Dirección (Autocompletado Predictivo)</h5>
-            <input type="text" id="addressInput" placeholder="Escribí calle, altura y localidad..." autocomplete="off">
-            <div id="suggestions" class="suggestions-box" style="display:none;"></div>
+            <h5>🔎 Búsqueda de Dirección (Autocompletado Predictivo en Vivo)</h5>
+            <div class="search-box-wrapper">
+                <input type="text" id="addressInput" placeholder="Escribí calle, altura y localidad (ej: Santiago del Estero 1557)..." autocomplete="off">
+                <div id="suggestions" class="suggestions-box" style="display:none;"></div>
+            </div>
             <div id="map"></div>
         </div>
 
-        <!-- COLUMNA COTIZACIÓN -->
+        <!-- COTIZACIÓN -->
         <div class="panel">
             <h5>⚙️ Cotización y Registro de Pedido</h5>
-            <div style="margin-top: 10px; padding: 10px; background: #21262d; border-radius: 6px;">
-                <div style="color: #58a6ff; font-weight: bold; font-size: 1.1rem;" id="infoLocalidad">📍 CASTELAR (Zona OESTE)</div>
-                <div style="margin-top: 5px; font-size: 0.9rem;">Valor Sugerido: <span class="badge-precio" id="infoPrecio">$9.700</span></div>
+            <div style="margin-top: 10px; padding: 12px; background: #21262d; border-radius: 6px;">
+                <div style="color: #58a6ff; font-weight: bold; font-size: 1.1rem;" id="infoLocalidad">📍 SELECCIONÁ UNA DIRECCIÓN</div>
+                <div style="margin-top: 5px; font-size: 0.9rem;">Valor Recomendado: <span class="badge-precio" id="infoPrecio">$0</span></div>
                 <div style="font-size: 0.85rem; margin-top: 5px;" id="infoDistancia">📏 Distancia del Tramo: <b>+0.0 km</b> (Desde Depósito Castelar)</div>
-                <div style="font-size: 0.85rem; margin-top: 3px; color: #facc15;" id="infoFranja">📅 Franjas: Mar y Mié: 08:30-11:00 hs</div>
+                <div style="font-size: 0.85rem; margin-top: 3px; color: #facc15;" id="infoFranja">📅 Franjas: Seleccione un punto en el mapa</div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
@@ -106,7 +122,7 @@
 
     <!-- TABLA EN VIVO HOJA DE RUTA -->
     <div class="tabla-container">
-        <h5>📋 Hoja de Ruta Activa (Modificable en Vivo)</h5>
+        <h5>📋 Hoja de Ruta Activa (Pedidos Agendados)</h5>
         <table id="tablaRuta">
             <thead>
                 <tr>
@@ -117,64 +133,126 @@
         </table>
     </div>
 
-    <!-- JS Leaflet Mapa -->
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const DEP_LAT = -34.6582, DEP_LON = -58.6481; // Tucumán 1769, Castelar
+        let baseLocalidades = [];
+        let baseHorarios = [];
         let pedidos = [];
-        let puntoActual = { lat: DEP_LAT, lon: DEP_LON, direccion: "Depósito Castelar", precio: 9700, zona: "OESTE", localidad: "Castelar" };
+        let puntoActual = { lat: DEP_LAT, lon: DEP_LON, direccion: "", precio: 0, zona: "OESTE", localidad: "Castelar", distancia: 0 };
         let map, markerDep, currentMarker, polyline;
 
-        // Inicializar Mapa
+        const SHEET_ID = "1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88";
+
+        // Cargar Base de Datos desde Google Sheets en formato CSV público
+        async function cargarGoogleSheets() {
+            try {
+                const urlLoc = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Localidades%20y%20valores`;
+                const urlHor = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=HORARIOS`;
+
+                const resLoc = await fetch(urlLoc);
+                const csvLoc = await resLoc.text();
+                baseLocalidades = parseCSV(csvLoc);
+
+                const resHor = await fetch(urlHor);
+                const csvHor = await resHor.text();
+                baseHorarios = parseCSV(csvHor);
+            } catch (e) {
+                console.error("Error al cargar Google Sheets", e);
+            }
+        }
+
+        function parseCSV(text) {
+            const lines = text.split('\n');
+            const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+            return lines.slice(1).map(line => {
+                const data = line.split(',').map(d => d.replace(/"/g, '').trim());
+                let obj = {};
+                headers.forEach((h, i) => obj[h] = data[i] || '');
+                return obj;
+            });
+        }
+
+        // Inicializar Mapa Leaflet
         map = L.map('map').setView([DEP_LAT, DEP_LON], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         markerDep = L.marker([DEP_LAT, DEP_LON]).addTo(map).bindPopup("Depósito: Tucumán 1769, Castelar").openPopup();
 
-        // Buscador Predictivo (LocationIQ / Nominatim API en vivo)
         const addressInput = document.getElementById('addressInput');
         const suggestionsBox = document.getElementById('suggestions');
 
-        addressInput.addEventListener('input', async function() {
-            const query = this.value;
+        // AUTOCOMPLETADO PREDICTIVO EN VIVO USANDO PHOTON API (SIN CORS Y ULTRA RÁPIDO)
+        addressInput.addEventListener('input', function() {
+            const query = this.value.trim();
             if (query.length < 3) { suggestionsBox.style.display = 'none'; return; }
 
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Buenos Aires, Argentina')}&limit=5`);
-            const data = await response.json();
+            // Consulta focalizada en AMBA con punto pivote en Castelar
+            const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=-34.6582&lon=-58.6481&lang=es&limit=6`;
 
-            suggestionsBox.innerHTML = '';
-            if (data.length > 0) {
-                suggestionsBox.style.display = 'block';
-                data.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'suggestion-item';
-                    div.innerText = item.display_name;
-                    div.onclick = () => seleccionarDireccion(item);
-                    suggestionsBox.appendChild(div);
-                });
-            }
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    suggestionsBox.innerHTML = '';
+                    if (data.features && data.features.length > 0) {
+                        suggestionsBox.style.display = 'block';
+                        data.features.forEach(feat => {
+                            const props = feat.properties;
+                            const calle = props.street || props.name || '';
+                            const num = props.housenumber || '';
+                            const ciudad = props.city || props.district || props.county || 'AMBA';
+                            
+                            const label = `${calle} ${num}, ${ciudad}`.trim();
+                            
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.innerText = label;
+                            div.onclick = () => seleccionarDireccion(feat.geometry.coordinates, label, ciudad);
+                            suggestionsBox.appendChild(div);
+                        });
+                    } else {
+                        suggestionsBox.style.display = 'none';
+                    }
+                })
+                .catch(() => suggestionsBox.style.display = 'none');
         });
 
-        function seleccionarDireccion(item) {
+        function seleccionarDireccion(coords, labelCompleto, ciudadDetectada) {
             suggestionsBox.style.display = 'none';
-            addressInput.value = item.display_name.split(',')[0] + ', ' + (item.address?.suburb || item.address?.city || 'AMBA');
+            addressInput.value = labelCompleto;
 
-            const lat = parseFloat(item.lat), lon = parseFloat(item.lon);
-            puntoActual.lat = lat; puntoActual.lon = lon;
-            puntoActual.direccion = addressInput.value;
+            const lon = coords[0], lat = coords[1];
+            puntoActual.lat = lat;
+            puntoActual.lon = lon;
+            puntoActual.direccion = labelCompleto;
 
-            // Mover mapa y marcador
+            // Cruzar localidad con el Sheets de Neokings
+            let match = baseLocalidades.find(l => 
+                l.Localidad && labelCompleto.toLowerCase().includes(l.Localidad.toLowerCase())
+            );
+
+            if (!match) match = baseLocalidades[0] || { Localidad: ciudadDetectada, Zona: "OESTE", "Valor Recomendado": 9700 };
+
+            puntoActual.localidad = match.Localidad || ciudadDetectada;
+            puntoActual.zona = match.Zona || "OESTE";
+            puntoActual.precio = match["Valor Recomendado"] || match["Valor de viaje"] || 9700;
+
+            // Mover Marcador en Mapa
             if (currentMarker) map.removeLayer(currentMarker);
-            currentMarker = L.marker([lat, lon]).addTo(map).bindPopup(`Selección: ${addressInput.value}`).openPopup();
+            currentMarker = L.marker([lat, lon]).addTo(map).bindPopup(`Ubicación: ${labelCompleto}`).openPopup();
             map.setView([lat, lon], 13);
 
-            // Calcular Distancia Tramo desde Última Parada
+            // Calcular Distancia Tramo desde el punto anterior de la ruta
             const origen = pedidos.length === 0 ? { lat: DEP_LAT, lon: DEP_LON, nombre: "Depósito Castelar" } : pedidos[pedidos.length - 1];
             const dist = calcularDistancia(origen.lat, origen.lon, lat, lon);
             puntoActual.distancia = dist;
 
+            // Actualizar Panel
+            document.getElementById('infoLocalidad').innerText = `📍 ${puntoActual.localidad.toUpperCase()} (Zona ${puntoActual.zona})`;
+            document.getElementById('infoPrecio').innerText = `$${Number(puntoActual.precio).toLocaleString()}`;
             document.getElementById('infoDistancia').innerHTML = `📏 Distancia del Tramo: <b>+${dist} km</b> (Desde ${origen.nombre || 'Parada #' + pedidos.length})`;
-            
-            // Dibujar Ruta
+            document.getElementById('infoFranja').innerText = `📅 Franjas habilitadas según planilla oficial de ${puntoActual.zona}`;
+
             renderizarMapa();
         }
 
@@ -196,6 +274,11 @@
         }
 
         function agendarPedido() {
+            if (!puntoActual.direccion) {
+                alert("Por favor seleccioná una dirección del desplegable antes de agendar.");
+                return;
+            }
+
             const cliente = document.getElementById('nombreCliente').value;
             const vendedor = document.getElementById('vendedorSel').value;
             const bultos = document.getElementById('bultosInput').value;
@@ -208,7 +291,7 @@
                 direccion: puntoActual.direccion,
                 zona: puntoActual.zona,
                 precio: puntoActual.precio,
-                distancia: puntoActual.distancia || 0,
+                distancia: puntoActual.distancia,
                 bultos: bultos,
                 dia: dia,
                 lat: puntoActual.lat,
@@ -231,7 +314,7 @@
                         <td>${p.vendedor}</td>
                         <td contenteditable="true">${p.direccion}</td>
                         <td>${p.zona}</td>
-                        <td>$${p.precio}</td>
+                        <td>$${Number(p.precio).toLocaleString()}</td>
                         <td>+${p.distancia} km</td>
                         <td contenteditable="true">${p.bultos}</td>
                         <td>${p.dia}</td>
@@ -246,6 +329,9 @@
             actualizarTabla();
             renderizarMapa();
         }
+
+        // Cargar datos al iniciar
+        window.onload = cargarGoogleSheets;
     </script>
 </body>
 </html>

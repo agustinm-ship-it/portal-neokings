@@ -9,12 +9,13 @@ st.set_page_config(
     page_title="Portal SPL - Neokings", layout="wide", page_icon="🚚"
 )
 
-# ESTILOS MODO OSCURO
+# ESTILOS MODO OSCURO NEÓN
 st.markdown(
     """
     <style>
     .stApp { background-color: #0d1117; color: #c9d1d9; }
     .block-container { padding-top: 1rem; padding-bottom: 1rem; }
+    
     .stButton>button {
         background-color: #21262d;
         color: #58a6ff;
@@ -24,6 +25,7 @@ st.markdown(
         font-size: 0.85rem;
     }
     .stButton>button:hover { background-color: #30363d; border-color: #58a6ff; }
+
     .card-dia {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -35,6 +37,7 @@ st.markdown(
     .badge-verde { color: #3dd68c; font-weight: bold; }
     .badge-amarillo { color: #facc15; font-weight: bold; }
     .badge-rojo { color: #f87171; font-weight: bold; }
+    
     .panel-resumen {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -58,7 +61,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ID DE GOOGLE SHEETS PARA LEER LA HOJA 'HORARIOS'
+# ID DE GOOGLE SHEETS
 SHEET_ID = "https://docs.google.com/spreadsheets/d/1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88/edit?usp=sharing"
 
 
@@ -71,7 +74,6 @@ def cargar_horarios_sheets(sheet_id):
         resumen_horarios.columns = ["Zona", "Días y Franjas Horarias Habilitadas"]
         return resumen_horarios
     except Exception:
-        # Base de Respaldo Integrada para Evitar Caídas
         return pd.DataFrame([
             {
                 "Zona": "OESTE",
@@ -96,18 +98,69 @@ def cargar_horarios_sheets(sheet_id):
 
 df_franjas = cargar_horarios_sheets(SHEET_ID)
 
-# INICIALIZACIÓN DE LA MEMORIA DE SESIÓN (RUTA ACUMULADA)
+# BASE DE PADRÓN LOCALIDADES AMBA CON COORDENADAS BASE DE RESPALDO
+BASE_LOCALIDADES = {
+    "Paso del Rey": {
+        "Partido": "Moreno",
+        "Zona": "OESTE",
+        "Precio": 11500,
+        "Lat": -34.652,
+        "Lon": -58.732,
+    },
+    "Castelar": {
+        "Partido": "Morón",
+        "Zona": "OESTE",
+        "Precio": 9700,
+        "Lat": -34.658,
+        "Lon": -58.648,
+    },
+    "Flores": {
+        "Partido": "CABA",
+        "Zona": "CABA",
+        "Precio": 12500,
+        "Lat": -34.628,
+        "Lon": -58.461,
+    },
+    "Belgrano": {
+        "Partido": "CABA",
+        "Zona": "CABA/NORTE",
+        "Precio": 13600,
+        "Lat": -34.561,
+        "Lon": -58.456,
+    },
+    "Merlo": {
+        "Partido": "Merlo",
+        "Zona": "OESTE/NORTE",
+        "Precio": 6400,
+        "Lat": -34.665,
+        "Lon": -58.728,
+    },
+    "San Miguel": {
+        "Partido": "San Miguel",
+        "Zona": "NORTE/OESTE",
+        "Precio": 8800,
+        "Lat": -34.542,
+        "Lon": -58.712,
+    },
+    "Vicente Lopez": {
+        "Partido": "Vicente López",
+        "Zona": "NORTE/CABA",
+        "Precio": 12700,
+        "Lat": -34.528,
+        "Lon": -58.473,
+    },
+}
+
 if "pedidos_ruta" not in st.session_state:
     st.session_state.pedidos_ruta = []
 
-# COORDENADAS BASE DEL DEPÓSITO (TUCUMÁN 1769, CASTELAR)
+# DEPOSITO: TUCUMÁN 1769, CASTELAR
 LAT_DEP = -34.6582
 LON_DEP = -58.6481
 
 
-# FUNCIÓN CÁLCULO DE DISTANCIA (HAVERSINE / TRACCIADO EN KM)
 def calcular_distancia(lat1, lon1, lat2, lon2):
-    R = 6371  # Radio de la Tierra en km
+    R = 6371
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
     a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(
@@ -117,21 +170,21 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
     return round(R * c, 1)
 
 
-# 1. ENCABEZADO Y ATAJOS
+# ENCABEZADO
 col_head1, col_b1, col_b2, col_b3 = st.columns([3.5, 1, 1, 1.2])
 with col_head1:
     st.markdown("### 🚚 PORTAL COMERCIAL - SISTEMA SPL")
 with col_b1:
     if st.button("📅 Matriz Semanal"):
-        st.toast("Cargando franjas horarias habilitadas...")
+        st.toast("Cargando franjas horarias...")
 with col_b2:
     if st.button("📋 Reglas Carga"):
-        st.toast("Horario límite de carga: 17:30 hs.")
+        st.toast("Horario límite: 17:30 hs.")
 with col_b3:
     if st.button("🔔 Alertas (2)"):
-        st.toast("⚠️ 2 pedidos en standby cerca del límite.")
+        st.toast("⚠️ 2 pedidos pendientes en límite.")
 
-# 2. CUADROS SEMANALES DE CAPACIDAD
+# CAPACIDAD SEMANAL
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
     st.markdown(
@@ -171,74 +224,48 @@ with c5:
 
 st.markdown("---")
 
-# 3. COLUMNAS PRINCIPALES
 col_izq, col_der = st.columns([1.3, 1])
 
 with col_izq:
-    st.markdown("##### 🔎 Buscar Dirección Completa")
+    st.markdown("##### 🔎 Selección de Dirección del Cliente")
 
-    col_inp, col_clean = st.columns([4, 1])
-    with col_inp:
-        direccion_input = st.text_input(
-            "Escribí Calle, Altura y Localidad:",
-            value="Bacacay 1763, Flores",
-            placeholder="Ej: Tucumán 1763, Castelar",
-            label_visibility="collapsed",
+    col_inp1, col_inp2 = st.columns([1.5, 2])
+    with col_inp1:
+        loc_seleccionada = st.selectbox(
+            "1. Localidad / Barrio:",
+            options=list(BASE_LOCALIDADES.keys()),
+            index=0,
         )
-    with col_clean:
-        if st.button("🗑️ Reiniciar Ruta"):
-            st.session_state.pedidos_ruta = []
-            st.rerun()
+    with col_inp2:
+        calle_altura = st.text_input(
+            "2. Calle y Altura:",
+            value="Santiago del Estero 1557",
+            placeholder="Ej: Bacacay 1763",
+        )
 
-    lat_actual, lon_actual = LAT_DEP, LON_DEP
-    localidad_det, zona_det, precio_sugerido = "Castelar", "OESTE", 9700
+    data_loc = BASE_LOCALIDADES[loc_seleccionada]
+    lat_actual, lon_actual = data_loc["Lat"], data_loc["Lon"]
 
-    if direccion_input:
-        geolocator = Nominatim(user_agent="neokings_spl_app_v6")
+    # Intento de ajuste fino de coordenadas
+    if calle_altura:
         try:
-            location = geolocator.geocode(
-                f"{direccion_input}, Buenos Aires, Argentina"
+            geolocator = Nominatim(user_agent="neokings_spl_v7")
+            loc_geo = geolocator.geocode(
+                f"{calle_altura}, {loc_seleccionada}, Buenos Aires, Argentina"
             )
-            if location:
-                lat_actual, lon_actual = location.latitude, location.longitude
-
-                # Detección automática de Zona y Precio Base
-                txt = direccion_input.lower()
-                if "flores" in txt or "caba" in txt:
-                    localidad_det, zona_det, precio_sugerido = (
-                        "Flores",
-                        "CABA",
-                        12500,
-                    )
-                elif "belgrano" in txt:
-                    localidad_det, zona_det, precio_sugerido = (
-                        "Belgrano",
-                        "CABA/NORTE",
-                        13600,
-                    )
-                elif "castelar" in txt or "moron" in txt:
-                    localidad_det, zona_det, precio_sugerido = (
-                        "Castelar",
-                        "OESTE",
-                        9700,
-                    )
-                elif "paso del rey" in txt or "moreno" in txt:
-                    localidad_det, zona_det, precio_sugerido = (
-                        "Paso del Rey",
-                        "OESTE",
-                        11500,
-                    )
+            if loc_geo:
+                lat_actual, lon_actual = loc_geo.latitude, loc_geo.longitude
         except Exception:
             pass
 
-    # DETERMINAR PUNTO DE ORIGEN PARA CÁLCULO DE KM DEL TRAMO
+    # Determinación de origen para tramos
     if len(st.session_state.pedidos_ruta) == 0:
         origen_lat, origen_lon = LAT_DEP, LON_DEP
         origen_nombre = "Depósito Castelar"
         num_parada = 1
     else:
-        ultimo_pedido = st.session_state.pedidos_ruta[-1]
-        origen_lat, origen_lon = ultimo_pedido["lat"], ultimo_pedido["lon"]
+        ultimo = st.session_state.pedidos_ruta[-1]
+        origen_lat, origen_lon = ultimo["lat"], ultimo["lon"]
         origen_nombre = f"Parada #{len(st.session_state.pedidos_ruta)}"
         num_parada = len(st.session_state.pedidos_ruta) + 1
 
@@ -246,19 +273,17 @@ with col_izq:
         origen_lat, origen_lon, lat_actual, lon_actual
     )
 
-    # CONSTRUCCIÓN DEL MAPA INTERACTIVO Y DIBUJO DE TRAYECTORIA
+    # MAPA CON RUTA
     m = folium.Map(
         location=[lat_actual, lon_actual], zoom_start=12, tiles="OpenStreetMap"
     )
 
-    # Pin Depósito
     folium.Marker(
         [LAT_DEP, LON_DEP],
         popup="Depósito: Tucumán 1769, Castelar",
         icon=folium.Icon(color="green", icon="home"),
     ).add_to(m)
 
-    # Trazado de ruta acumulada
     puntos_trayectoria = [[LAT_DEP, LON_DEP]]
     for idx, ped in enumerate(st.session_state.pedidos_ruta):
         pt = [ped["lat"], ped["lon"]]
@@ -269,15 +294,13 @@ with col_izq:
             icon=folium.Icon(color="blue", icon="info-sign"),
         ).add_to(m)
 
-    # Punto actual en búsqueda
     puntos_trayectoria.append([lat_actual, lon_actual])
     folium.Marker(
         [lat_actual, lon_actual],
-        popup=f"Búsqueda Actual (#{num_parada}): {direccion_input}",
+        popup=f"Búsqueda Actual (#{num_parada}): {calle_altura}",
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
 
-    # Dibujar la línea de trayectoria continua
     folium.PolyLine(
         puntos_trayectoria, color="#38bdf8", weight=4, opacity=0.85
     ).add_to(m)
@@ -288,7 +311,8 @@ with col_der:
     st.markdown("##### ⚙️ Panel de Cotización y Agendamiento")
 
     franja_match = df_franjas[
-        df_franjas["Zona"].astype(str).str.upper() == zona_det.upper()
+        df_franjas["Zona"].astype(str).str.upper()
+        == data_loc["Zona"].upper()
     ]
     franja_txt = (
         franja_match.iloc[0]["Días y Franjas Horarias Habilitadas"]
@@ -299,12 +323,12 @@ with col_der:
     st.markdown(
         f"""
     <div class='panel-resumen'>
-        <div class='badge-zona'>📍 {localidad_det.upper()} — ZONA {zona_det}</div>
+        <div class='badge-zona'>📍 {loc_seleccionada.upper()} ({data_loc['Partido']}) — ZONA {data_loc['Zona']}</div>
         <hr style='border-color: #30363d; margin: 10px 0;'>
         <div style='display: flex; justify-content: space-between; align-items: center;'>
             <div>
                 <small style='color: #8b949e;'>Valor Sugerido:</small><br>
-                <span class='badge-precio'>${precio_sugerido:,}</span>
+                <span class='badge-precio'>${data_loc['Precio']:,}</span>
             </div>
             <div style='text-align: right;'>
                 <small style='color: #8b949e;'>Orden de Ruta:</small><br>
@@ -349,7 +373,7 @@ with col_der:
     with c_act1:
         if st.button("➕ Agendar CONFIRMADO", use_container_width=True):
             st.session_state.pedidos_ruta.append({
-                "direccion": direccion_input,
+                "direccion": f"{calle_altura}, {loc_seleccionada}",
                 "lat": lat_actual,
                 "lon": lon_actual,
                 "bultos": bultos,

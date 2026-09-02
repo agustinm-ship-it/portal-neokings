@@ -15,7 +15,6 @@ st.markdown(
     <style>
     .stApp { background-color: #0d1117; color: #c9d1d9; }
     .block-container { padding-top: 1rem; padding-bottom: 1rem; }
-    
     .stButton>button {
         background-color: #21262d;
         color: #58a6ff;
@@ -25,7 +24,6 @@ st.markdown(
         font-size: 0.85rem;
     }
     .stButton>button:hover { background-color: #30363d; border-color: #58a6ff; }
-
     .card-dia {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -37,7 +35,6 @@ st.markdown(
     .badge-verde { color: #3dd68c; font-weight: bold; }
     .badge-amarillo { color: #facc15; font-weight: bold; }
     .badge-rojo { color: #f87171; font-weight: bold; }
-    
     .panel-resumen {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -47,43 +44,56 @@ st.markdown(
     }
     .badge-precio { font-size: 1.8rem; font-weight: bold; color: #3dd68c; }
     .badge-zona { font-size: 1.1rem; font-weight: bold; color: #58a6ff; }
-    .alerta-box {
-        background-color: #2d1517;
-        border: 1px solid #f87171;
-        border-radius: 8px;
-        padding: 10px;
-        color: #f87171;
-        font-size: 0.82rem;
-        margin-top: 10px;
-    }
-    .alerta-warning {
-        background-color: #2b2413;
-        border: 1px solid #facc15;
-        border-radius: 8px;
-        padding: 10px;
-        color: #facc15;
-        font-size: 0.82rem;
-        margin-top: 10px;
-    }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
-# ID DE GOOGLE SHEETS
+# PONÉ ACÁ EL ID DE TU GOOGLE SHEETS REAL
 SHEET_ID = "https://docs.google.com/spreadsheets/d/1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88/edit?usp=sharing"
 
 
 @st.cache_data(ttl=60)
-def cargar_horarios_sheets(sheet_id):
+def cargar_datos_sheets(sheet_id):
     try:
+        url_loc = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=Localidades%20y%20valores"
         url_hor = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=HORARIOS"
+        df_loc = pd.read_csv(url_loc)
         df_hor = pd.read_csv(url_hor)
+
+        df_loc.columns = [c.strip() for c in df_loc.columns]
         resumen_horarios = df_hor.iloc[5:17, [0, 1]].dropna()
         resumen_horarios.columns = ["Zona", "Días y Franjas Horarias Habilitadas"]
-        return resumen_horarios
+        return df_loc, resumen_horarios
     except Exception:
-        return pd.DataFrame([
+        # Fallback de seguridad en caso de desconexión momentánea
+        df_loc = pd.DataFrame([
+            {
+                "Localidad": "Castelar",
+                "Partido": "Morón",
+                "Zona": "OESTE",
+                "Valor de viaje": 9700,
+                "Código Postal": "1712",
+                "Valor Recomendado": 9700,
+            },
+            {
+                "Localidad": "Paso del Rey",
+                "Partido": "Moreno",
+                "Zona": "OESTE",
+                "Valor de viaje": 11500,
+                "Código Postal": "1742",
+                "Valor Recomendado": 11500,
+            },
+            {
+                "Localidad": "Flores",
+                "Partido": "CABA",
+                "Zona": "CABA",
+                "Valor de viaje": 12500,
+                "Código Postal": "1406",
+                "Valor Recomendado": 12500,
+            },
+        ])
+        df_hor = pd.DataFrame([
             {
                 "Zona": "OESTE",
                 "Días y Franjas Horarias Habilitadas": (
@@ -96,78 +106,17 @@ def cargar_horarios_sheets(sheet_id):
                     "Lun y Jue: 08:30-11:00 hs | Mié: 13:00-15:00 hs"
                 ),
             },
-            {
-                "Zona": "NORTE",
-                "Días y Franjas Horarias Habilitadas": (
-                    "Lun: 13:00-15:00 hs | Vie: 11:00-13:00 hs"
-                ),
-            },
         ])
+        return df_loc, df_hor
 
 
-df_franjas = cargar_horarios_sheets(SHEET_ID)
-
-BASE_LOCALIDADES = {
-    "Paso del Rey": {
-        "Partido": "Moreno",
-        "Zona": "OESTE",
-        "Precio": 11500,
-        "Lat": -34.652,
-        "Lon": -58.732,
-    },
-    "Castelar": {
-        "Partido": "Morón",
-        "Zona": "OESTE",
-        "Precio": 9700,
-        "Lat": -34.658,
-        "Lon": -58.648,
-    },
-    "Flores": {
-        "Partido": "CABA",
-        "Zona": "CABA",
-        "Precio": 12500,
-        "Lat": -34.628,
-        "Lon": -58.461,
-    },
-    "Belgrano": {
-        "Partido": "CABA",
-        "Zona": "CABA/NORTE",
-        "Precio": 13600,
-        "Lat": -34.561,
-        "Lon": -58.456,
-    },
-    "Merlo": {
-        "Partido": "Merlo",
-        "Zona": "OESTE/NORTE",
-        "Precio": 6400,
-        "Lat": -34.665,
-        "Lon": -58.728,
-    },
-    "San Miguel": {
-        "Partido": "San Miguel",
-        "Zona": "NORTE/OESTE",
-        "Precio": 8800,
-        "Lat": -34.542,
-        "Lon": -58.712,
-    },
-    "Vicente Lopez": {
-        "Partido": "Vicente López",
-        "Zona": "NORTE/CABA",
-        "Precio": 12700,
-        "Lat": -34.528,
-        "Lon": -58.473,
-    },
-}
+df_localidades, df_franjas = cargar_datos_sheets(SHEET_ID)
 
 if "pedidos_ruta" not in st.session_state:
     st.session_state.pedidos_ruta = []
 
-if "calle_input_val" not in st.session_state:
-    st.session_state.calle_input_val = ""
-
-# DEPOSITOPUNTO BASE: TUCUMÁN 1769, CASTELAR
-LAT_DEP = -34.6582
-LON_DEP = -58.6481
+# PUNTO BASE DEPÓSITO: TUCUMÁN 1769, CASTELAR
+LAT_DEP, LON_DEP = -34.6582, -58.6481
 
 
 def calcular_distancia(lat1, lon1, lat2, lon2):
@@ -181,7 +130,7 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
     return round(R * c, 1)
 
 
-# ENCABEZADO
+# 1. ENCABEZADO Y ATAJOS
 col_head1, col_b1, col_b2, col_b3 = st.columns([3.5, 1, 1, 1.2])
 with col_head1:
     st.markdown("### 🚚 PORTAL COMERCIAL - SISTEMA SPL")
@@ -195,7 +144,7 @@ with col_b3:
     if st.button("🔔 Alertas (2)"):
         st.toast("⚠️ 2 pedidos pendientes en límite.")
 
-# CAPACIDAD SEMANAL
+# 2. BANDERAS SEMANALES DE CAPACIDAD
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
     st.markdown(
@@ -238,36 +187,52 @@ st.markdown("---")
 col_izq, col_der = st.columns([1.3, 1])
 
 with col_izq:
-    st.markdown("##### 🔎 Selección de Dirección del Cliente")
+    st.markdown("##### 🔎 Buscar Dirección Completa (AMBA)")
 
-    col_inp1, col_inp2 = st.columns([1.5, 2])
-    with col_inp1:
-        loc_seleccionada = st.selectbox(
-            "1. Localidad / Barrio:",
-            options=list(BASE_LOCALIDADES.keys()),
-            index=0,
+    col_input, col_reset = st.columns([4, 1])
+    with col_input:
+        direccion_input = st.text_input(
+            "Dirección:",
+            value="Tucumán 1769, Castelar",
+            placeholder="Ej: Bacacay 1763, Flores",
+            label_visibility="collapsed",
         )
-    with col_inp2:
-        calle_altura = st.text_input(
-            "2. Calle y Altura:",
-            value=st.session_state.calle_input_val,
-            placeholder="Ej: Marcelo T. de Alvear 2000",
-        )
+    with col_reset:
+        if st.button("🗑️ Limpiar Ruta"):
+            st.session_state.pedidos_ruta = []
+            st.rerun()
 
-    data_loc = BASE_LOCALIDADES[loc_seleccionada]
-    lat_actual, lon_actual = data_loc["Lat"], data_loc["Lon"]
+    lat_actual, lon_actual = LAT_DEP, LON_DEP
+    loc_detectada = "Castelar"
 
-    if calle_altura.strip():
+    # BUSCADOR GEOGRÁFICO UNIFICADO
+    if direccion_input.strip():
         try:
-            geolocator = Nominatim(user_agent="neokings_spl_v8")
+            geolocator = Nominatim(user_agent="neokings_spl_v9")
             loc_geo = geolocator.geocode(
-                f"{calle_altura}, {loc_seleccionada}, Buenos Aires, Argentina"
+                f"{direccion_input}, Buenos Aires, Argentina"
             )
             if loc_geo:
                 lat_actual, lon_actual = loc_geo.latitude, loc_geo.longitude
         except Exception:
             pass
 
+        # Buscar coincidencia de localidad en tu padrón de Sheets
+        for loc_nombre in df_localidades["Localidad"].dropna().unique():
+            if str(loc_nombre).lower() in direccion_input.lower():
+                loc_detectada = str(loc_nombre)
+                break
+
+    # OBTENER DATOS DE LA LOCALIDAD DESDE EL SHEETS
+    match = df_localidades[
+        df_localidades["Localidad"].astype(str).str.lower()
+        == loc_detectada.lower()
+    ]
+    row_data = (
+        match.iloc[0] if not match.empty else df_localidades.iloc[0]
+    )
+
+    # CÁLCULO DE ORIGEN Y DISTANCIA TRAMO
     if len(st.session_state.pedidos_ruta) == 0:
         origen_lat, origen_lon = LAT_DEP, LON_DEP
         origen_nombre = "Depósito Castelar"
@@ -282,6 +247,7 @@ with col_izq:
         origen_lat, origen_lon, lat_actual, lon_actual
     )
 
+    # MAPA CON RUTA CONTINUA
     m = folium.Map(
         location=[lat_actual, lon_actual], zoom_start=12, tiles="OpenStreetMap"
     )
@@ -305,9 +271,7 @@ with col_izq:
     puntos_trayectoria.append([lat_actual, lon_actual])
     folium.Marker(
         [lat_actual, lon_actual],
-        popup=(
-            f"Búsqueda Actual (#{num_parada}): {calle_altura or loc_seleccionada}"
-        ),
+        popup=f"Búsqueda Actual (#{num_parada}): {direccion_input}",
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
 
@@ -320,9 +284,9 @@ with col_izq:
 with col_der:
     st.markdown("##### ⚙️ Panel de Cotización y Agendamiento")
 
+    zona_key = str(row_data["Zona"])
     franja_match = df_franjas[
-        df_franjas["Zona"].astype(str).str.upper()
-        == data_loc["Zona"].upper()
+        df_franjas["Zona"].astype(str).str.upper() == zona_key.upper()
     ]
     franja_txt = (
         franja_match.iloc[0]["Días y Franjas Horarias Habilitadas"]
@@ -333,12 +297,13 @@ with col_der:
     st.markdown(
         f"""
     <div class='panel-resumen'>
-        <div class='badge-zona'>📍 {loc_seleccionada.upper()} ({data_loc['Partido']}) — ZONA {data_loc['Zona']}</div>
+        <div class='badge-zona'>📍 {str(row_data['Localidad']).upper()} ({row_data['Partido']}) — ZONA {row_data['Zona']}</div>
+        <div style='margin-top: 4px; font-size: 0.85rem;'>CP: <b>{row_data['Código Postal']}</b></div>
         <hr style='border-color: #30363d; margin: 10px 0;'>
         <div style='display: flex; justify-content: space-between; align-items: center;'>
             <div>
                 <small style='color: #8b949e;'>Valor Sugerido:</small><br>
-                <span class='badge-precio'>${data_loc['Precio']:,}</span>
+                <span class='badge-precio'>${row_data['Valor Recomendado']:,}</span>
             </div>
             <div style='text-align: right;'>
                 <small style='color: #8b949e;'>Orden de Ruta:</small><br>
@@ -371,46 +336,17 @@ with col_der:
         ],
     )
 
-    # VALIDACIÓN DE INCOMPATIBILIDAD DE ZONA
-    zona_localidad = data_loc["Zona"].upper()
-    zona_dia_sel = dia_agendado.upper()
-
-    if (
-        ("OESTE" in zona_localidad and "OESTE" not in zona_dia_sel)
-        or ("NORTE" in zona_localidad and "NORTE" not in zona_dia_sel)
-        or ("CABA" in zona_localidad and "CABA" not in zona_dia_sel)
-    ):
-        st.markdown(
-            f"<div class='alerta-warning'>⚠️ <b>Incompatibilidad de Zona:</b>"
-            f" {loc_seleccionada} pertenece a <b>{data_loc['Zona']}</b> y"
-            f" el día seleccionado corresponde a <b>{dia_agendado}</b>.</div>",
-            unsafe_allow_html=True,
-        )
-
-    if "Miércoles" in dia_agendado:
-        st.markdown(
-            "<div class='alerta-box'>⚠️ <b>Ruta Crítica:</b> Capacidad del"
-            " Miércoles al 100%.</div>",
-            unsafe_allow_html=True,
-        )
-
     st.markdown("<br>", unsafe_allow_html=True)
     c_act1, c_act2 = st.columns(2)
     with c_act1:
         if st.button("➕ Agendar CONFIRMADO", use_container_width=True):
-            direccion_guardar = (
-                f"{calle_altura}, {loc_seleccionada}"
-                if calle_altura.strip()
-                else loc_seleccionada
-            )
             st.session_state.pedidos_ruta.append({
-                "direccion": direccion_guardar,
+                "direccion": direccion_input,
                 "lat": lat_actual,
                 "lon": lon_actual,
                 "bultos": bultos,
                 "dia": dia_agendado,
             })
-            st.session_state.calle_input_val = ""
             st.success(f"✅ Pedido #{num_parada} guardado correctamente.")
             st.rerun()
     with c_act2:

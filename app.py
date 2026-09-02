@@ -1,10 +1,11 @@
 import folium
+import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
 
 st.set_page_config(page_title="Portal SPL - Neokings", layout="wide")
 
-# CSS Modo Oscuro Neón
+# Estilos CSS Oscuro Neón
 st.markdown(
     """
     <style>
@@ -49,6 +50,45 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+# DATOS DE BASE (FALLBACK Y LOCALIDADES)
+LOCALIDADES_BASE = {
+    "Castelar": {
+        "Zona": "OESTE",
+        "Valor": 9700,
+        "Dia": "Martes / Viernes",
+        "Lat": -34.658,
+        "Lon": -58.648,
+    },
+    "Hurlingham": {
+        "Zona": "OESTE",
+        "Valor": 10500,
+        "Dia": "Martes / Viernes",
+        "Lat": -34.588,
+        "Lon": -58.638,
+    },
+    "Vicente Lopez": {
+        "Zona": "NORTE",
+        "Valor": 12700,
+        "Dia": "Lunes / Jueves",
+        "Lat": -34.528,
+        "Lon": -58.473,
+    },
+    "Flores": {
+        "Zona": "CABA",
+        "Valor": 12500,
+        "Dia": "Miércoles",
+        "Lat": -34.628,
+        "Lon": -58.461,
+    },
+    "Belgrano": {
+        "Zona": "CABA",
+        "Valor": 12500,
+        "Dia": "Miércoles",
+        "Lat": -34.561,
+        "Lon": -58.456,
+    },
+}
 
 # ENCABEZADO Y ATAJOS
 col_titulo, col_btn1, col_btn2, col_btn3 = st.columns([3, 1.2, 1.2, 1.5])
@@ -110,19 +150,30 @@ col_izq, col_der = st.columns([1.4, 1])
 with col_izq:
     st.markdown("##### 🔎 Búsqueda de Ubicación y Mapa AMBA")
     col_input, col_cant = st.columns([3, 1])
+
     with col_input:
         direccion_in = st.text_input(
             "Dirección del Cliente:",
-            value="Bacacay 1763, Flores",
-            label_visibility="collapsed",
+            value="Tucumán 1763, Castelar",
+            placeholder="Escribí una dirección o localidad...",
         )
     with col_cant:
-        paquetes_in = st.number_input(
-            "Paquetes:", min_value=1, value=1, label_visibility="collapsed"
-        )
+        paquetes_in = st.number_input("Paquetes:", min_value=1, value=1)
 
+    # Lógica de búsqueda dinámica
+    loc_detectada = "Castelar"
+    for loc_key in LOCALIDADES_BASE.keys():
+        if loc_key.lower() in direccion_in.lower():
+            loc_detectada = loc_key
+            break
+
+    data_loc = LOCALIDADES_BASE[loc_detectada]
+
+    # Dibuja el mapa centrado en la ubicación buscada
     m = folium.Map(
-        location=[-34.615, -58.445], zoom_start=11, tiles="OpenStreetMap"
+        location=[data_loc["Lat"], data_loc["Lon"]],
+        zoom_start=12,
+        tiles="OpenStreetMap",
     )
     folium.Marker(
         [-34.654, -58.619],
@@ -130,17 +181,12 @@ with col_izq:
         icon=folium.Icon(color="green", icon="home"),
     ).add_to(m)
     folium.Marker(
-        [-34.628, -58.461],
-        popup="Bacacay 1763 - CONFIRMADO (#1)",
-        icon=folium.Icon(color="blue", icon="info-sign"),
-    ).add_to(m)
-    folium.Marker(
-        [-34.561, -58.456],
-        popup="Belgrano - PENDIENTE (#2)",
-        icon=folium.Icon(color="gray", icon="info-sign"),
+        [data_loc["Lat"], data_loc["Lon"]],
+        popup=f"{direccion_in} - BÚSQUEDA ACTUAL",
+        icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
     folium.PolyLine(
-        [[-34.654, -58.619], [-34.628, -58.461], [-34.561, -58.456]],
+        [[-34.654, -58.619], [data_loc["Lat"], data_loc["Lon"]]],
         color="#38bdf8",
         weight=4,
         opacity=0.85,
@@ -152,18 +198,18 @@ with col_der:
     st.markdown("##### ⚙️ Panel de Cotización y Agendamiento")
 
     st.markdown(
-        """
+        f"""
     <div class='panel-accion'>
-        <div style='font-size: 0.9rem; color: #58a6ff; font-weight: bold;'>📍 UBICACIÓN DETECTADA: FLORES — CABA</div>
+        <div style='font-size: 0.9rem; color: #58a6ff; font-weight: bold;'>📍 UBICACIÓN DETECTADA: {loc_detectada.upper()} — ZONA {data_loc['Zona']}</div>
         <div style='display: flex; justify-content: space-between; margin-top: 10px;'>
-            <div><b>Valor Sugerido:</b> $12.500</div>
-            <div><b>Prioridad Zona:</b> Miércoles</div>
+            <div><b>Valor Sugerido:</b> ${data_loc['Valor']:,}</div>
+            <div><b>Días Recomendados:</b> {data_loc['Dia']}</div>
         </div>
         <hr style='border-color: #30363d; margin: 10px 0;'>
         <div style='font-size: 0.85rem;'>
-            <b>Posición Estimada en Ruta:</b> Parada #2<br>
-            <b>Horario Estimado de Entrega:</b> 10:30 – 12:00 hs<br>
-            <b>Kilómetros Adicionales:</b> +4.2 km
+            <b>Posición Estimada en Ruta:</b> Parada #3<br>
+            <b>Horario Estimado de Entrega:</b> 11:30 – 13:00 hs<br>
+            <b>Kilómetros Adicionales:</b> +3.5 km
         </div>
     </div>
     """,
@@ -179,7 +225,7 @@ with col_der:
             "Jueves (Zona Norte)",
             "Viernes (Zona Oeste)",
         ],
-        index=1,
+        index=1 if data_loc["Zona"] == "OESTE" else 0,
     )
 
     col_act1, col_act2 = st.columns(2)

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal SPL - Neokings</title>
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
@@ -18,13 +17,13 @@
         .rojo { color: #f87171; font-weight: bold; }
         
         .main-container { display: grid; grid-template-columns: 1.3fr 1fr; gap: 15px; }
-        .panel { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 15px; position: relative; }
+        .panel { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 15px; }
         
         input, select, button { width: 100%; padding: 10px; margin-top: 8px; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; }
         button { background: #238636; color: white; font-weight: bold; cursor: pointer; border: none; margin-top: 15px; }
         button:hover { background: #2ea043; }
         
-        #map { height: 360px; border-radius: 8px; margin-top: 10px; }
+        #map { height: 320px; border-radius: 8px; margin-top: 10px; }
         .badge-precio { font-size: 1.8rem; color: #3dd68c; font-weight: bold; }
         
         .tabla-container { margin-top: 20px; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 15px; }
@@ -49,9 +48,17 @@
     <div class="main-container">
         <!-- BUSCADOR Y MAPA -->
         <div class="panel">
-            <h5>🔎 Búsqueda de Dirección (Sugerencias en Vivo)</h5>
-            <input type="text" id="addressInput" list="localidadesList" placeholder="Escribí dirección y localidad (ej: Santiago del Estero 1557, Paso del Rey)..." autocomplete="off" onchange="buscarUbicacion()">
-            <datalist id="localidadesList"></datalist>
+            <h5>🔎 Selección de Dirección del Cliente</h5>
+            <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px;">
+                <div>
+                    <label style="font-size: 0.8rem;">1. Localidad / Barrio:</label>
+                    <select id="localidadSel" onchange="actualizarCotizacion()"></select>
+                </div>
+                <div>
+                    <label style="font-size: 0.8rem;">2. Calle y Altura exactos:</label>
+                    <input type="text" id="calleInput" value="Santiago del Estero 1557" placeholder="Ej: Bacacay 1763" onchange="actualizarCotizacion()">
+                </div>
+            </div>
             <div id="map"></div>
         </div>
 
@@ -59,10 +66,10 @@
         <div class="panel">
             <h5>⚙️ Cotización y Registro de Pedido</h5>
             <div style="margin-top: 10px; padding: 12px; background: #21262d; border-radius: 6px;">
-                <div style="color: #58a6ff; font-weight: bold; font-size: 1.1rem;" id="infoLocalidad">📍 INGRESÁ UNA DIRECCIÓN</div>
+                <div style="color: #58a6ff; font-weight: bold; font-size: 1.1rem;" id="infoLocalidad">📍 SELECCIONÁ UNA LOCALIDAD</div>
                 <div style="margin-top: 5px; font-size: 0.9rem;">Valor Recomendado: <span class="badge-precio" id="infoPrecio">$0</span></div>
                 <div style="font-size: 0.85rem; margin-top: 5px;" id="infoDistancia">📏 Distancia del Tramo: <b>+0.0 km</b> (Desde Depósito Castelar)</div>
-                <div style="font-size: 0.85rem; margin-top: 3px; color: #facc15;" id="infoFranja">📅 Franjas: Según zonificación oficial</div>
+                <div style="font-size: 0.85rem; margin-top: 3px; color: #facc15;" id="infoFranja">📅 Franjas habilitadas según zona</div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
@@ -113,106 +120,69 @@
         </table>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const DEP_LAT = -34.6582, DEP_LON = -58.6481; // Tucumán 1769, Castelar
-        let baseLocalidades = [];
+
+        const padronLocalidades = [
+            { nombre: "Castelar", partido: "Morón", zona: "OESTE", precio: 9700, lat: -34.6582, lon: -58.6481, franja: "Mar y Mié: 08:30-11:00 hs | Vie: 15:00-17:00 hs" },
+            { nombre: "Paso del Rey", partido: "Moreno", zona: "OESTE", precio: 11500, lat: -34.6520, lon: -58.7320, franja: "Mar y Mié: 08:30-11:00 hs | Vie: 15:00-17:00 hs" },
+            { nombre: "Flores", partido: "CABA", zona: "CABA", precio: 12500, lat: -34.6280, lon: -58.4610, franja: "Lun y Jue: 08:30-11:00 hs | Mié: 13:00-15:00 hs" },
+            { nombre: "Belgrano", partido: "CABA", zona: "CABA/NORTE", precio: 13600, lat: -34.5610, lon: -58.4560, franja: "Lun y Jue: 08:30-11:00 hs | Mié: 13:00-15:00 hs" },
+            { nombre: "Ramos Mejía", partido: "La Matanza", zona: "OESTE", precio: 9100, lat: -34.6470, lon: -58.5630, franja: "Mar y Mié: 08:30-11:00 hs | Vie: 15:00-17:00 hs" },
+            { nombre: "Merlo", partido: "Merlo", zona: "OESTE/NORTE", precio: 12800, lat: -34.6650, lon: -58.7280, franja: "Mar y Mié: 11:00-13:00 hs" },
+            { nombre: "Vicente López", partido: "Vicente López", zona: "NORTE/CABA", precio: 16500, lat: -34.5280, lon: -58.4730, franja: "Lun y Jue: 11:00-13:00 hs" }
+        ];
+
         let pedidos = [];
-        let puntoActual = { lat: DEP_LAT, lon: DEP_LON, direccion: "", precio: 0, zona: "OESTE", localidad: "Castelar", distancia: 0 };
-        let map, markerDep, currentMarker, polyline;
+        let puntoActual = {};
+        let map, currentMarker, polyline;
 
-        const SHEET_ID = "1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88";
-
-        // Cargar Base de Datos desde Google Sheets
-        async function cargarGoogleSheets() {
-            try {
-                const urlLoc = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Localidades%20y%20valores`;
-                const resLoc = await fetch(urlLoc);
-                const csvLoc = await resLoc.text();
-                baseLocalidades = parseCSV(csvLoc);
-                poblarDatalist();
-            } catch (e) {
-                console.error("Error al cargar Google Sheets", e);
-            }
-        }
-
-        function parseCSV(text) {
-            const lines = text.split('\n');
-            if (lines.length < 2) return [];
-            const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
-            return lines.slice(1).map(line => {
-                const data = line.split(',').map(d => d.replace(/"/g, '').trim());
-                let obj = {};
-                headers.forEach((h, i) => obj[h] = data[i] || '');
-                return obj;
-            });
-        }
-
-        function poblarDatalist() {
-            const datalist = document.getElementById('localidadesList');
-            datalist.innerHTML = '';
-            baseLocalidades.forEach(item => {
-                if (item.Localidad) {
-                    const opt = document.createElement('option');
-                    opt.value = `${item.Localidad} (${item.Partido || 'AMBA'}) - Zona ${item.Zona || ''}`;
-                    datalist.appendChild(opt);
-                }
-            });
-        }
-
-        // Inicializar Mapa Leaflet
+        // Inicializar Mapa
         map = L.map('map').setView([DEP_LAT, DEP_LON], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        markerDep = L.marker([DEP_LAT, DEP_LON]).addTo(map).bindPopup("Depósito: Tucumán 1769, Castelar").openPopup();
+        L.marker([DEP_LAT, DEP_LON]).addTo(map).bindPopup("Depósito: Tucumán 1769, Castelar").openPopup();
 
-        async function buscarUbicacion() {
-            const inputVal = document.getElementById('addressInput').value.trim();
-            if (!inputVal) return;
+        // Cargar Selector de Localidades
+        const selectLoc = document.getElementById('localidadSel');
+        padronLocalidades.forEach((item, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.innerText = `${item.nombre} (${item.partido})`;
+            selectLoc.appendChild(opt);
+        });
 
-            // Cruzar localidad con el Sheets de Neokings
-            let match = baseLocalidades.find(l => 
-                l.Localidad && inputVal.toLowerCase().includes(l.Localidad.toLowerCase())
-            );
+        function actualizarCotizacion() {
+            const locIdx = selectLoc.value;
+            const locObj = padronLocalidades[locIdx];
+            const calleVal = document.getElementById('calleInput').value.trim() || locObj.nombre;
 
-            if (!match) match = baseLocalidades[0] || { Localidad: "Castelar", Zona: "OESTE", "Valor Recomendado": 9700 };
+            puntoActual = {
+                localidad: locObj.nombre,
+                partido: locObj.partido,
+                zona: locObj.zona,
+                precio: locObj.precio,
+                franja: locObj.franja,
+                direccion: `${calleVal}, ${locObj.nombre}`,
+                lat: locObj.lat,
+                lon: locObj.lon
+            };
 
-            puntoActual.localidad = match.Localidad || "Castelar";
-            puntoActual.zona = match.Zona || "OESTE";
-            puntoActual.precio = match["Valor Recomendado"] || match["Valor de viaje"] || 9700;
-            puntoActual.direccion = inputVal;
-
-            // Coordenadas vía Geocoding script seguro
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(inputVal + ', Buenos Aires, Argentina')}&limit=1`);
-                const data = await res.json();
-                if (data && data.length > 0) {
-                    puntoActual.lat = parseFloat(data[0].lat);
-                    puntoActual.lon = parseFloat(data[0].lon);
-                } else {
-                    puntoActual.lat = DEP_LAT - 0.02; // Offset visual seguro
-                    puntoActual.lon = DEP_LON - 0.03;
-                }
-            } catch (e) {
-                puntoActual.lat = DEP_LAT - 0.02;
-                puntoActual.lon = DEP_LON - 0.03;
-            }
-
-            // Mover Marcador en Mapa
+            // Mover Marcador
             if (currentMarker) map.removeLayer(currentMarker);
-            currentMarker = L.marker([puntoActual.lat, puntoActual.lon]).addTo(map).bindPopup(`Ubicación: ${inputVal}`).openPopup();
+            currentMarker = L.marker([puntoActual.lat, puntoActual.lon]).addTo(map).bindPopup(puntoActual.direccion).openPopup();
             map.setView([puntoActual.lat, puntoActual.lon], 13);
 
-            // Calcular Distancia Tramo desde el punto anterior de la ruta
+            // Calcular Distancia Tramo
             const origen = pedidos.length === 0 ? { lat: DEP_LAT, lon: DEP_LON, nombre: "Depósito Castelar" } : pedidos[pedidos.length - 1];
             const dist = calcularDistancia(origen.lat, origen.lon, puntoActual.lat, puntoActual.lon);
             puntoActual.distancia = dist;
 
             // Actualizar Panel
-            document.getElementById('infoLocalidad').innerText = `📍 ${puntoActual.localidad.toUpperCase()} (Zona ${puntoActual.zona})`;
-            document.getElementById('infoPrecio').innerText = `$${Number(puntoActual.precio).toLocaleString()}`;
+            document.getElementById('infoLocalidad').innerText = `📍 ${puntoActual.localidad.toUpperCase()} (${puntoActual.partido}) — ZONA ${puntoActual.zona}`;
+            document.getElementById('infoPrecio').innerText = `$${puntoActual.precio.toLocaleString()}`;
             document.getElementById('infoDistancia').innerHTML = `📏 Distancia del Tramo: <b>+${dist} km</b> (Desde ${origen.nombre || 'Parada #' + pedidos.length})`;
-            document.getElementById('infoFranja').innerText = `📅 Franjas habilitadas según planilla oficial de ${puntoActual.zona}`;
+            document.getElementById('infoFranja').innerText = `📅 Franjas: ${puntoActual.franja}`;
 
             renderizarMapa();
         }
@@ -235,11 +205,6 @@
         }
 
         function agendarPedido() {
-            if (!puntoActual.direccion) {
-                alert("Por favor escribí una dirección antes de agendar.");
-                return;
-            }
-
             const cliente = document.getElementById('nombreCliente').value;
             const vendedor = document.getElementById('vendedorSel').value;
             const bultos = document.getElementById('bultosInput').value;
@@ -256,11 +221,9 @@
                 bultos: bultos,
                 dia: dia,
                 lat: puntoActual.lat,
-                lon: puntoActual.lon,
-                nombre: `Parada #${pedidos.length + 1}`
+                lon: puntoActual.lon
             });
 
-            document.getElementById('addressInput').value = '';
             actualizarTabla();
             renderizarMapa();
         }
@@ -276,7 +239,7 @@
                         <td>${p.vendedor}</td>
                         <td contenteditable="true">${p.direccion}</td>
                         <td>${p.zona}</td>
-                        <td>$${Number(p.precio).toLocaleString()}</td>
+                        <td>$${p.precio.toLocaleString()}</td>
                         <td>+${p.distancia} km</td>
                         <td contenteditable="true">${p.bultos}</td>
                         <td>${p.dia}</td>
@@ -292,7 +255,7 @@
             renderizarMapa();
         }
 
-        window.onload = cargarGoogleSheets;
+        window.onload = actualizarCotizacion;
     </script>
 </body>
 </html>

@@ -49,7 +49,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# PONÉ ACÁ EL ID DE TU GOOGLE SHEETS REAL
+# INGRESA TU ID DE GOOGLE SHEETS
 SHEET_ID = "https://docs.google.com/spreadsheets/d/1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88/edit?usp=sharing"
 
 
@@ -66,7 +66,6 @@ def cargar_datos_sheets(sheet_id):
         resumen_horarios.columns = ["Zona", "Días y Franjas Horarias Habilitadas"]
         return df_loc, resumen_horarios
     except Exception:
-        # Fallback de seguridad en caso de desconexión momentánea
         df_loc = pd.DataFrame([
             {
                 "Localidad": "Castelar",
@@ -115,7 +114,7 @@ df_localidades, df_franjas = cargar_datos_sheets(SHEET_ID)
 if "pedidos_ruta" not in st.session_state:
     st.session_state.pedidos_ruta = []
 
-# PUNTO BASE DEPÓSITO: TUCUMÁN 1769, CASTELAR
+# DEPÓSITO CASTELAR: TUCUMÁN 1769
 LAT_DEP, LON_DEP = -34.6582, -58.6481
 
 
@@ -130,13 +129,21 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
     return round(R * c, 1)
 
 
-# 1. ENCABEZADO Y ATAJOS
+# PRIORIDAD DE ZONAS POR DÍA
+PRIORIDADES = {
+    "OESTE": "Martes y Viernes (Prioridad Zona Oeste)",
+    "CABA": "Lunes y Miércoles (Prioridad CABA)",
+    "NORTE": "Lunes y Jueves (Prioridad Zona Norte)",
+    "SUR": "Martes y Miércoles (Prioridad Zona Sur)",
+}
+
+# ENCABEZADO Y ATAJOS
 col_head1, col_b1, col_b2, col_b3 = st.columns([3.5, 1, 1, 1.2])
 with col_head1:
     st.markdown("### 🚚 PORTAL COMERCIAL - SISTEMA SPL")
 with col_b1:
     if st.button("📅 Matriz Semanal"):
-        st.toast("Cargando franjas horarias...")
+        st.toast("Matriz de zonificación cargada.")
 with col_b2:
     if st.button("📋 Reglas Carga"):
         st.toast("Horario límite: 17:30 hs.")
@@ -144,41 +151,41 @@ with col_b3:
     if st.button("🔔 Alertas (2)"):
         st.toast("⚠️ 2 pedidos pendientes en límite.")
 
-# 2. BANDERAS SEMANALES DE CAPACIDAD
+# CAPACIDAD SEMANAL
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
     st.markdown(
         "<div class='card-dia'><b>LUNES</b><br><small"
-        " style='color:#8b949e'>Zona Norte</small><br>📦 10 | ⏱️ 6.0h<br><span"
-        " class='badge-verde'>🟢 HABILITADO</span></div>",
+        " style='color:#8b949e'>Prioridad Norte / CABA</small><br>📦 10 |"
+        " ⏱️ 6.0h<br><span class='badge-verde'>🟢 HABILITADO</span></div>",
         unsafe_allow_html=True,
     )
 with c2:
     st.markdown(
         "<div class='card-dia'><b>MARTES</b><br><small"
-        " style='color:#8b949e'>Zona Oeste</small><br>📦 18 | ⏱️ 5.8h<br><span"
-        " class='badge-amarillo'>🟡 PRÓX. CRÍTICO</span></div>",
+        " style='color:#8b949e'>Prioridad Oeste / Sur</small><br>📦 18 | ⏱️"
+        " 5.8h<br><span class='badge-amarillo'>🟡 PRÓX. CRÍTICO</span></div>",
         unsafe_allow_html=True,
     )
 with c3:
     st.markdown(
         "<div class='card-dia'><b>MIÉRCOLES</b><br><small"
-        " style='color:#8b949e'>CABA / Sur</small><br>📦 22 | ⏱️ 7.2h<br><span"
-        " class='badge-rojo'>🔴 CRÍTICO</span></div>",
+        " style='color:#8b949e'>Prioridad CABA / Sur</small><br>📦 22 | ⏱️"
+        " 7.2h<br><span class='badge-rojo'>🔴 CRÍTICO</span></div>",
         unsafe_allow_html=True,
     )
 with c4:
     st.markdown(
         "<div class='card-dia'><b>JUEVES</b><br><small"
-        " style='color:#8b949e'>Zona Norte</small><br>📦 8 | ⏱️ 4.1h<br><span"
-        " class='badge-verde'>🟢 HABILITADO</span></div>",
+        " style='color:#8b949e'>Prioridad Norte</small><br>📦 8 | ⏱️"
+        " 4.1h<br><span class='badge-verde'>🟢 HABILITADO</span></div>",
         unsafe_allow_html=True,
     )
 with c5:
     st.markdown(
         "<div class='card-dia'><b>VIERNES</b><br><small"
-        " style='color:#8b949e'>Zona Oeste</small><br>📦 12 | ⏱️ 5.0h<br><span"
-        " class='badge-verde'>🟢 HABILITADO</span></div>",
+        " style='color:#8b949e'>Prioridad Oeste</small><br>📦 12 | ⏱️"
+        " 5.0h<br><span class='badge-verde'>🟢 HABILITADO</span></div>",
         unsafe_allow_html=True,
     )
 
@@ -187,15 +194,14 @@ st.markdown("---")
 col_izq, col_der = st.columns([1.3, 1])
 
 with col_izq:
-    st.markdown("##### 🔎 Buscar Dirección Completa (AMBA)")
+    st.markdown("##### 🔎 Dirección del Cliente y Mapa de Ruta")
 
     col_input, col_reset = st.columns([4, 1])
     with col_input:
         direccion_input = st.text_input(
-            "Dirección:",
-            value="Tucumán 1769, Castelar",
-            placeholder="Ej: Bacacay 1763, Flores",
-            label_visibility="collapsed",
+            "Ingresá Dirección Completa (Calle, Altura y Localidad):",
+            value="Bacacay 1763, Flores",
+            placeholder="Ej: Tucumán 1769, Castelar",
         )
     with col_reset:
         if st.button("🗑️ Limpiar Ruta"):
@@ -205,10 +211,10 @@ with col_izq:
     lat_actual, lon_actual = LAT_DEP, LON_DEP
     loc_detectada = "Castelar"
 
-    # BUSCADOR GEOGRÁFICO UNIFICADO
+    # RESOLUCIÓN AUTOMÁTICA DE DIRECCIÓN Y ZONA
     if direccion_input.strip():
         try:
-            geolocator = Nominatim(user_agent="neokings_spl_v9")
+            geolocator = Nominatim(user_agent="neokings_spl_v10")
             loc_geo = geolocator.geocode(
                 f"{direccion_input}, Buenos Aires, Argentina"
             )
@@ -217,13 +223,11 @@ with col_izq:
         except Exception:
             pass
 
-        # Buscar coincidencia de localidad en tu padrón de Sheets
         for loc_nombre in df_localidades["Localidad"].dropna().unique():
             if str(loc_nombre).lower() in direccion_input.lower():
                 loc_detectada = str(loc_nombre)
                 break
 
-    # OBTENER DATOS DE LA LOCALIDAD DESDE EL SHEETS
     match = df_localidades[
         df_localidades["Localidad"].astype(str).str.lower()
         == loc_detectada.lower()
@@ -247,11 +251,10 @@ with col_izq:
         origen_lat, origen_lon, lat_actual, lon_actual
     )
 
-    # MAPA CON RUTA CONTINUA
+    # MAPA CON TRAYECTORIA
     m = folium.Map(
         location=[lat_actual, lon_actual], zoom_start=12, tiles="OpenStreetMap"
     )
-
     folium.Marker(
         [LAT_DEP, LON_DEP],
         popup="Depósito: Tucumán 1769, Castelar",
@@ -264,14 +267,16 @@ with col_izq:
         puntos_trayectoria.append(pt)
         folium.Marker(
             pt,
-            popup=f"Parada #{idx + 1}: {ped['direccion']}",
+            popup=(
+                f"Parada #{idx + 1}: {ped['cliente']} - {ped['direccion']}"
+            ),
             icon=folium.Icon(color="blue", icon="info-sign"),
         ).add_to(m)
 
     puntos_trayectoria.append([lat_actual, lon_actual])
     folium.Marker(
         [lat_actual, lon_actual],
-        popup=f"Búsqueda Actual (#{num_parada}): {direccion_input}",
+        popup=f"Actual (#{num_parada}): {direccion_input}",
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
 
@@ -282,7 +287,7 @@ with col_izq:
     st_folium(m, width=680, height=360)
 
 with col_der:
-    st.markdown("##### ⚙️ Panel de Cotización y Agendamiento")
+    st.markdown("##### ⚙️ Cotización y Datos del Cliente")
 
     zona_key = str(row_data["Zona"])
     franja_match = df_franjas[
@@ -293,12 +298,14 @@ with col_der:
         if not franja_match.empty
         else "Consulte disponibilidad con logística."
     )
+    prioridad_txt = PRIORIDADES.get(
+        zona_key, "Según cronograma semanal de zona"
+    )
 
     st.markdown(
         f"""
     <div class='panel-resumen'>
         <div class='badge-zona'>📍 {str(row_data['Localidad']).upper()} ({row_data['Partido']}) — ZONA {row_data['Zona']}</div>
-        <div style='margin-top: 4px; font-size: 0.85rem;'>CP: <b>{row_data['Código Postal']}</b></div>
         <hr style='border-color: #30363d; margin: 10px 0;'>
         <div style='display: flex; justify-content: space-between; align-items: center;'>
             <div>
@@ -312,43 +319,100 @@ with col_der:
         </div>
         <hr style='border-color: #30363d; margin: 10px 0;'>
         <div style='font-size: 0.85rem; line-height: 1.6;'>
+            ⭐ <b>Días de Prioridad:</b> <span style='color:#facc15;'>{prioridad_txt}</span><br>
             📏 <b>Distancia del Tramo:</b> +{dist_tramo} km (Desde {origen_nombre})<br>
-            ⏱️ <b>Ventana Estimada:</b> 11:30 – 13:00 hs<br>
-            📅 <b>Franjas Habilitadas:</b><br>
-            <span style='color:#facc15;'>{franja_txt}</span>
+            📅 <b>Franjas Habilitadas:</b> {franja_txt}
         </div>
     </div>
     """,
         unsafe_allow_html=True,
     )
 
-    bultos = st.number_input(
-        "📦 Cantidad de Bultos/Paquetes:", min_value=1, value=1
-    )
-    dia_agendado = st.selectbox(
-        "📅 Seleccionar Día para Programar Entrega:",
-        [
-            "Martes (Zona Oeste)",
-            "Viernes (Zona Oeste)",
-            "Lunes (Zona Norte)",
-            "Miércoles (CABA / Sur)",
-            "Jueves (Zona Norte)",
-        ],
-    )
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        nombre_cliente = st.text_input(
+            "👤 Nombre / Comercio del Cliente:",
+            value="Zapatería San Martín",
+            placeholder="Ej: Juan Pérez",
+        )
+    with col_c2:
+        telefono_cliente = st.text_input(
+            "📞 Teléfono / Contacto:",
+            value="11 4455-8899",
+            placeholder="Ej: 1122334455",
+        )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    col_b1, col_b2 = st.columns(2)
+    with col_b1:
+        bultos = st.number_input(
+            "📦 Cantidad de Bultos:", min_value=1, value=1
+        )
+    with col_b2:
+        dia_agendado = st.selectbox(
+            "📅 Día de Entrega:",
+            [
+                "Lunes (Prioridad Norte)",
+                "Martes (Prioridad Oeste)",
+                "Miércoles (Prioridad CABA / Sur)",
+                "Jueves (Prioridad Norte)",
+                "Viernes (Prioridad Oeste)",
+            ],
+            index=1,
+        )
+
     c_act1, c_act2 = st.columns(2)
     with c_act1:
         if st.button("➕ Agendar CONFIRMADO", use_container_width=True):
             st.session_state.pedidos_ruta.append({
+                "parada": num_parada,
+                "cliente": nombre_cliente,
+                "contacto": telefono_cliente,
                 "direccion": direccion_input,
-                "lat": lat_actual,
-                "lon": lon_actual,
+                "localidad": row_data["Localidad"],
+                "zona": row_data["Zona"],
+                "precio": row_data["Valor Recomendado"],
+                "distancia": dist_tramo,
                 "bultos": bultos,
                 "dia": dia_agendado,
+                "lat": lat_actual,
+                "lon": lon_actual,
             })
-            st.success(f"✅ Pedido #{num_parada} guardado correctamente.")
+            st.success(
+                f"✅ Parada #{num_parada} ({nombre_cliente}) agendada."
+            )
             st.rerun()
     with c_act2:
         if st.button("⏳ Dejar PENDIENTE", use_container_width=True):
-            st.warning("⏱️ Pedido guardado en Standby por 2 horas.")
+            st.warning("⏱️ Guardado en Standby por 2 horas.")
+
+# TABLA EN VIVO DE PEDIDOS CARGADOS EN RUTA
+if len(st.session_state.pedidos_ruta) > 0:
+    st.markdown("---")
+    st.markdown("##### 📋 Hoja de Ruta Activa (Pedidos Agendados)")
+    df_tabla = pd.DataFrame(st.session_state.pedidos_ruta)[
+        [
+            "parada",
+            "cliente",
+            "contacto",
+            "direccion",
+            "localidad",
+            "zona",
+            "precio",
+            "distancia",
+            "bultos",
+            "dia",
+        ]
+    ]
+    df_tabla.columns = [
+        "Parada #",
+        "Cliente",
+        "Contacto",
+        "Dirección",
+        "Localidad",
+        "Zona",
+        "Precio ($)",
+        "Dist. Tramo (km)",
+        "Bultos",
+        "Día Programado",
+    ]
+    st.dataframe(df_tabla, use_container_width=True)

@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="Portal SPL - Neokings", layout="wide", page_icon="🚚"
 )
 
-# ESTILOS MODO OSCURO NEÓN
+# ESTILOS MODO OSCURO
 st.markdown(
     """
     <style>
@@ -56,6 +56,15 @@ st.markdown(
         font-size: 0.82rem;
         margin-top: 10px;
     }
+    .alerta-warning {
+        background-color: #2b2413;
+        border: 1px solid #facc15;
+        border-radius: 8px;
+        padding: 10px;
+        color: #facc15;
+        font-size: 0.82rem;
+        margin-top: 10px;
+    }
     </style>
 """,
     unsafe_allow_html=True,
@@ -98,7 +107,6 @@ def cargar_horarios_sheets(sheet_id):
 
 df_franjas = cargar_horarios_sheets(SHEET_ID)
 
-# BASE DE PADRÓN LOCALIDADES AMBA CON COORDENADAS BASE DE RESPALDO
 BASE_LOCALIDADES = {
     "Paso del Rey": {
         "Partido": "Moreno",
@@ -154,7 +162,10 @@ BASE_LOCALIDADES = {
 if "pedidos_ruta" not in st.session_state:
     st.session_state.pedidos_ruta = []
 
-# DEPOSITO: TUCUMÁN 1769, CASTELAR
+if "calle_input_val" not in st.session_state:
+    st.session_state.calle_input_val = ""
+
+# DEPOSITOPUNTO BASE: TUCUMÁN 1769, CASTELAR
 LAT_DEP = -34.6582
 LON_DEP = -58.6481
 
@@ -239,17 +250,16 @@ with col_izq:
     with col_inp2:
         calle_altura = st.text_input(
             "2. Calle y Altura:",
-            value="Santiago del Estero 1557",
-            placeholder="Ej: Bacacay 1763",
+            value=st.session_state.calle_input_val,
+            placeholder="Ej: Marcelo T. de Alvear 2000",
         )
 
     data_loc = BASE_LOCALIDADES[loc_seleccionada]
     lat_actual, lon_actual = data_loc["Lat"], data_loc["Lon"]
 
-    # Intento de ajuste fino de coordenadas
-    if calle_altura:
+    if calle_altura.strip():
         try:
-            geolocator = Nominatim(user_agent="neokings_spl_v7")
+            geolocator = Nominatim(user_agent="neokings_spl_v8")
             loc_geo = geolocator.geocode(
                 f"{calle_altura}, {loc_seleccionada}, Buenos Aires, Argentina"
             )
@@ -258,7 +268,6 @@ with col_izq:
         except Exception:
             pass
 
-    # Determinación de origen para tramos
     if len(st.session_state.pedidos_ruta) == 0:
         origen_lat, origen_lon = LAT_DEP, LON_DEP
         origen_nombre = "Depósito Castelar"
@@ -273,7 +282,6 @@ with col_izq:
         origen_lat, origen_lon, lat_actual, lon_actual
     )
 
-    # MAPA CON RUTA
     m = folium.Map(
         location=[lat_actual, lon_actual], zoom_start=12, tiles="OpenStreetMap"
     )
@@ -297,7 +305,9 @@ with col_izq:
     puntos_trayectoria.append([lat_actual, lon_actual])
     folium.Marker(
         [lat_actual, lon_actual],
-        popup=f"Búsqueda Actual (#{num_parada}): {calle_altura}",
+        popup=(
+            f"Búsqueda Actual (#{num_parada}): {calle_altura or loc_seleccionada}"
+        ),
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
 
@@ -361,9 +371,25 @@ with col_der:
         ],
     )
 
+    # VALIDACIÓN DE INCOMPATIBILIDAD DE ZONA
+    zona_localidad = data_loc["Zona"].upper()
+    zona_dia_sel = dia_agendado.upper()
+
+    if (
+        ("OESTE" in zona_localidad and "OESTE" not in zona_dia_sel)
+        or ("NORTE" in zona_localidad and "NORTE" not in zona_dia_sel)
+        or ("CABA" in zona_localidad and "CABA" not in zona_dia_sel)
+    ):
+        st.markdown(
+            f"<div class='alerta-warning'>⚠️ <b>Incompatibilidad de Zona:</b>"
+            f" {loc_seleccionada} pertenece a <b>{data_loc['Zona']}</b> y"
+            f" el día seleccionado corresponde a <b>{dia_agendado}</b>.</div>",
+            unsafe_allow_html=True,
+        )
+
     if "Miércoles" in dia_agendado:
         st.markdown(
-            "<div class='alerta-box'>⚠️ <b>¡Ruta Crítica!</b> Capacidad del"
+            "<div class='alerta-box'>⚠️ <b>Ruta Crítica:</b> Capacidad del"
             " Miércoles al 100%.</div>",
             unsafe_allow_html=True,
         )
@@ -372,14 +398,20 @@ with col_der:
     c_act1, c_act2 = st.columns(2)
     with c_act1:
         if st.button("➕ Agendar CONFIRMADO", use_container_width=True):
+            direccion_guardar = (
+                f"{calle_altura}, {loc_seleccionada}"
+                if calle_altura.strip()
+                else loc_seleccionada
+            )
             st.session_state.pedidos_ruta.append({
-                "direccion": f"{calle_altura}, {loc_seleccionada}",
+                "direccion": direccion_guardar,
                 "lat": lat_actual,
                 "lon": lon_actual,
                 "bultos": bultos,
                 "dia": dia_agendado,
             })
-            st.success(f"✅ Pedido #{num_parada} guardado en la hoja de ruta.")
+            st.session_state.calle_input_val = ""
+            st.success(f"✅ Pedido #{num_parada} guardado correctamente.")
             st.rerun()
     with c_act2:
         if st.button("⏳ Dejar PENDIENTE", use_container_width=True):

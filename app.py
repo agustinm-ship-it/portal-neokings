@@ -8,7 +8,7 @@ st.set_page_config(
     page_title="Portal SPL - Neokings", layout="wide", page_icon="🚚"
 )
 
-# ESTILOS MODO OSCURO NEÓN COMPLETO
+# ESTILOS OSCURO NEÓN SIN SELECTOR SUPERIOR
 st.markdown(
     """
     <style>
@@ -55,18 +55,22 @@ st.markdown(
 SHEET_ID = "https://docs.google.com/spreadsheets/d/1HSnCjlmmqSG5zSPYNAAAsujwRD4rhZGQf4e_4bGec88/edit?usp=sharing"
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=30)
 def cargar_bases_desde_sheets(sheet_id):
     try:
         url_loc = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=Localidades%20y%20valores"
         url_hor = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=HORARIOS"
         df_loc = pd.read_csv(url_loc)
         df_hor = pd.read_csv(url_hor)
+
+        # Limpieza de columnas
+        df_loc.columns = [c.strip() for c in df_loc.columns]
         resumen_horarios = df_hor.iloc[5:17, [0, 1]].dropna()
         resumen_horarios.columns = ["Zona", "Días y Franjas Horarias Habilitadas"]
+
         return df_loc, resumen_horarios
     except Exception:
-        # Respaldo de seguridad si aún no se configuró el ID de Google Sheets
+        # Respaldo si no está configurado el ID aún
         datos_loc = [
             {
                 "Localidad": "Castelar",
@@ -77,20 +81,20 @@ def cargar_bases_desde_sheets(sheet_id):
                 "Valor Recomendado": 9700,
             },
             {
+                "Localidad": "Paso del Rey",
+                "Partido": "Moreno",
+                "Zona": "OESTE",
+                "Valor de viaje": 11500,
+                "Código Postal": "1742",
+                "Valor Recomendado": 11500,
+            },
+            {
                 "Localidad": "Belgrano",
                 "Partido": "CABA",
                 "Zona": "CABA/NORTE",
                 "Valor de viaje": 13600,
                 "Código Postal": "1428",
                 "Valor Recomendado": 13600,
-            },
-            {
-                "Localidad": "Flores",
-                "Partido": "CABA",
-                "Zona": "CABA",
-                "Valor de viaje": 12500,
-                "Código Postal": "1406",
-                "Valor Recomendado": 12500,
             },
         ]
         datos_hor = [
@@ -101,7 +105,7 @@ def cargar_bases_desde_sheets(sheet_id):
                 ),
             },
             {
-                "Zona": "CABA",
+                "Zona": "CABA/NORTE",
                 "Días y Franjas Horarias Habilitadas": (
                     "Lun y Jue: 08:30-11:00 hs | Mié: 13:00-15:00 hs"
                 ),
@@ -112,8 +116,8 @@ def cargar_bases_desde_sheets(sheet_id):
 
 df_localidades, df_franjas = cargar_bases_desde_sheets(SHEET_ID)
 
-# 1. ENCABEZADO Y BOTONES DE ATAJO
-col_head1, col_b1, col_b2, col_b3, col_head2 = st.columns([2.5, 1, 1, 1.2, 1.3])
+# 1. ENCABEZADO Y BOTONES DE ATAJO (SIN VENDEDORES)
+col_head1, col_b1, col_b2, col_b3 = st.columns([3, 1, 1, 1.2])
 with col_head1:
     st.markdown("### 🚚 PORTAL COMERCIAL - SISTEMA SPL")
 with col_b1:
@@ -125,19 +129,6 @@ with col_b2:
 with col_b3:
     if st.button("🔔 Alertas Pendientes (2)"):
         st.toast("⚠️ 2 pedidos en standby hace 1h 45m.")
-with col_head2:
-    vendedor = st.selectbox(
-        "Vendedor:",
-        [
-            "General",
-            "Agustín M.",
-            "Eugenia",
-            "E. Gómez",
-            "G. Collazo",
-            "L. Moreno",
-            "Celina Jara",
-        ],
-    )
 
 # 2. CUADROS SEMANALES DE CAPACIDAD
 c1, c2, c3, c4, c5 = st.columns(5)
@@ -179,48 +170,48 @@ with c5:
 
 st.markdown("---")
 
-# 3. COLUMNAS PRINCIPALES (BÚSQUEDA Y MAPA / PANEL DE ACCIÓN)
+# 3. COLUMNAS PRINCIPALES
 col_izq, col_der = st.columns([1.3, 1])
 
 with col_izq:
-    st.markdown("##### 🔎 Buscar Dirección o Localidad")
+    st.markdown("##### 🔎 Búsqueda de Dirección / Localidad")
 
-    # DESPLEGABLE DE SUGERENCIA + CAMPO DE TEXTO LIBRE
-    opciones_locs = df_localidades["Localidad"].astype(str).unique().tolist()
-    loc_seleccionada = st.selectbox(
-        "1. Seleccioná la Localidad o Barrio:",
-        options=opciones_locs,
+    # BUSCADOR AUTOCOMPLETADO
+    lista_opciones = df_localidades["Localidad"].astype(str).tolist()
+    localidad_sel = st.selectbox(
+        "Seleccioná la Localidad/Barrio:",
+        options=lista_opciones,
         index=0,
     )
 
-    direccion_input = st.text_input(
-        "2. Ingresá Calle y Altura exactos:",
+    calle_altura = st.text_input(
+        "Dirección exacta (Calle y Altura):",
         value="Santiago del Estero 1557",
         placeholder="Ej: Bacacay 1763",
     )
 
-    # Lógica de geolocalización
-    direccion_completa = f"{direccion_input}, {loc_seleccionada}, Buenos Aires"
-    geolocator = Nominatim(user_agent="neokings_spl_app_v2")
+    # GEOCODIFICACIÓN
+    geolocator = Nominatim(user_agent="neokings_spl_app_v3")
+    lat, lon = -34.654, -58.619
 
-    lat, lon = -34.654, -58.619  # Morón default
     try:
-        location = geolocator.geocode(direccion_completa)
+        query_geo = f"{calle_altura}, {localidad_sel}, Buenos Aires, Argentina"
+        location = geolocator.geocode(query_geo)
         if location:
             lat, lon = location.latitude, location.longitude
     except Exception:
         pass
 
-    # Obtención de fila correspondiente de la planilla
+    # CRUCE CON PLANILLA
     match = df_localidades[
         df_localidades["Localidad"].astype(str).str.lower()
-        == loc_seleccionada.lower()
+        == localidad_sel.lower()
     ]
     row_data = (
         match.iloc[0] if not match.empty else df_localidades.iloc[0]
     )
 
-    # DIBUJO DEL MAPA
+    # MAPA
     m = folium.Map(location=[lat, lon], zoom_start=13, tiles="OpenStreetMap")
     folium.Marker(
         [-34.654, -58.619],
@@ -229,7 +220,7 @@ with col_izq:
     ).add_to(m)
     folium.Marker(
         [lat, lon],
-        popup=f"Cliente: {direccion_input}, {loc_seleccionada}",
+        popup=f"Cliente: {calle_altura}, {localidad_sel}",
         icon=folium.Icon(color="red", icon="info-sign"),
     ).add_to(m)
     folium.PolyLine(
@@ -277,7 +268,7 @@ with col_der:
     with c_act1:
         if st.button("➕ Agendar CONFIRMADO", use_container_width=True):
             st.success(
-                f"✅ Pedido confirmado para {direccion_input}, {loc_seleccionada} ({bultos} bulto/s) - Agendado por {vendedor}."
+                f"✅ Pedido confirmado para {calle_altura}, {localidad_sel} ({bultos} bulto/s)."
             )
     with c_act2:
         if st.button("⏳ Dejar PENDIENTE", use_container_width=True):
